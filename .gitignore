@@ -1,0 +1,8 @@
+# Logs et etats runtime (regenerable, ne pas versionner)
+*.log
+*.pid
+.DS_Store
+
+# Fichiers eww generes a l'execution (aucun normalement dans ce dossier,
+# mais au cas ou un outil les cree ici plutot que dans ~/.cache/eww)
+*.lock

@@ -1,0 +1,121 @@
+/* eww.scss - glassmorphism: white text + border, transparent white glass fill */
+
+* { all: unset; }
+
+.panel {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 14px 18px;
+  color: white;
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 15px;
+}
+
+.header { margin-bottom: 4px; }
+.title  { font-weight: bold; }
+.synced { font-size: 12px; color: white; }
+
+.sep {
+  background-color: white;
+  min-height: 1px;
+  margin: 6px 0 12px 0;
+}
+
+.section    { margin-bottom: 12px; }
+.sect-label { font-weight: bold; }
+.sect-item  { color: white; }
+
+.sync-btn {
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 1px solid white;
+  color: white;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.sync-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
+
+/* icone de synchro dans l'en-tete (a droite de "Synchronisation - hh:mm") */
+.sync-icon {
+  margin-left: 8px;
+  font-size: 24px;
+  color: white;
+  padding: 0 4px;
+  background-color: transparent;
+}
+.sync-icon:hover { color: #8ecae6; }
+
+/* --- Digest : items cliquables (survol / lu-non lu) ---------------------- */
+.item { background-color: transparent; border: none; padding: 2px 4px;  }
+.item:hover { background-color: rgba(255, 255, 255, 0.12); }
+.item.selected { background-color: rgba(255, 255, 255, 0.20); }   /* mail ouvert : highlight persistant */
+.item-subject { color: white; }
+.item-subject.nonlu { font-weight: bold; }
+.item-meta { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+
+/* --- Digest : fenetres laterales (apercu / detail) ---------------------- */
+.side-title   { font-weight: bold; margin-bottom: 6px; }
+.side-from    { font-size: 12px; color: rgba(255, 255, 255, 0.70); margin-bottom: 4px; }
+.side-badges  { font-size: 11px; color: rgba(255, 255, 255, 0.60); margin-bottom: 8px; }
+.side-reason  { color: white; margin-bottom: 8px; }
+.side-summary { color: rgba(255, 255, 255, 0.85); margin-bottom: 8px; }
+
+.detail-head { margin-bottom: 4px; }
+.close-btn {
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  padding: 0 4px;
+  background-color: transparent;
+}
+.close-btn:hover { color: #ff6b6b; }
+
+/* separateur intent/classification <-> contenu (summary) */
+.side-sep { min-height: 1px; background-color: rgba(255, 255, 255, 0.30); margin: 10px 0; }
+
+/* barre d'actions en bas du detail */
+.detail-actions { margin-top: 10px; }
+.action-btn {
+  margin: 0 3px; padding: 6px 8px;
+  border: 1px solid white; color: white;
+  background-color: rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+}
+.action-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
+
+/* --- Recommandations du jour --------------------------------- */
+.reco-card {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+.reco-head  { margin-bottom: 2px; }
+.reco-title { font-weight: bold; }
+
+.reco-detail {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+  margin-left: 18px;
+}
+
+.reco-dot { margin-right: 8px; font-size: 12px; }
+.reco-dot.haute   { color: #ff6b6b; }
+.reco-dot.moyenne { color: #ffd166; }
+.reco-dot.basse   { color: #8ecae6; }
+
+.reco-empty { color: rgba(255, 255, 255, 0.6); font-style: italic; }
+
+/* --- Agenda : lignes cliquables (survol + selection) -------------------- */
+.ev-line { background-color: transparent; border: none; padding: 3px 4px; }
+.ev-line:hover { background-color: rgba(255, 255, 255, 0.12); }
+.ev-line.selected { background-color: rgba(255, 255, 255, 0.20); }  /* evenement ouvert */
+.ev-name { color: white; }
+.ev-when {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.70);
+  margin-left: 14px;
+}
+.ev-empty { color: rgba(255, 255, 255, 0.6); font-style: italic; }
+
+/* --- Agenda : champs de la modale de detail ---------------------------- */
+.ev-field { color: rgba(255, 255, 255, 0.88); margin-bottom: 4px; }
+.ev-link  { color: #8ecae6; }
