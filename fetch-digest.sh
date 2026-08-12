@@ -65,8 +65,12 @@ print(json.dumps({"sections":sections,"by_id":by_id,
 
 # Garde-fou : la liste va etre redessinee -> si un item etait survole a cet
 # instant precis, son onhoverlost peut ne jamais se declencher (widget detruit
-# pendant le survol). On referme l'apercu par securite ; il se rouvre au
-# prochain survol. N'affecte pas la modale de detail (opened_id/detail).
+# pendant le survol). On reinitialise juste la variable de survol : le
+# `revealer` se referme reactivement (voir preview_box dans eww.yuck) ; il se
+# rouvre au prochain survol. N'affecte pas la modale de detail (opened_id/detail).
+# IMPORTANT : ne JAMAIS faire "eww close preview" ici -- preview est ouverte
+# une seule fois par start.sh et ne doit plus jamais etre fermee (sinon elle
+# ne se rouvre plus jamais : constate le 12/08, cause du bug "le survol
+# n'affiche plus rien").
 EWW="$HOME/.cargo/bin/eww"
 "$EWW" update hovered_id="" >/dev/null 2>&1
-"$EWW" close preview >/dev/null 2>&1

@@ -8,7 +8,12 @@
 (defvar hovered_id "")
 (defvar opened_id  "")
 
-(defpoll digest :interval "5m" :initial "{}"
+;; :initial inclut deja "by_id":{} (defense en profondeur, en plus du repli
+;; "(digest.by_id ?: {})" dans preview_box/detail_box) : sans ca, digest.by_id
+;; vaut null tant que fetch-digest.sh n'a pas rendu son premier resultat, et
+;; indexer [id] dessus plante le rendu -- constate en prod : preview/detail
+;; s'ouvraient AVANT ce premier resultat et ne se sont plus jamais reaffiches.
+(defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
 ;; --- Item : survol -> apercu, clic -> detail -------------------------------
@@ -51,7 +56,7 @@
 ;; fenetre pouvait rester "active" du point de vue d'eww (verifie via
 ;; `eww active-windows`) sans jamais se peindre a l'ecran, surtout en
 ;; enchainant plusieurs survols rapproches. Ici, la fenetre reste mappee en
-;; permanence et seul son CONTENU est affiche/masque via un `revealer`,
+;; permanence et seul son CONTENU est affiche/masque via un `box :visible`,
 ;; pilote reactivement par la variable hovered_id -- une simple mise a jour
 ;; de variable, sans plus jamais remapper la fenetre X11 elle-meme.
 ;;
@@ -63,10 +68,15 @@
 ;; final, pas cette etape intermediaire. On calcule donc l'objet une seule
 ;; fois avec un repli "{}" AVANT d'aller chercher un champ dessus, dans un
 ;; sous-widget dedie.
+;; :visible plutot que revealer : un revealer collapse (:reveal false) peut
+;; garder une trace visuelle/allocation de son dernier rendu sous GTK (issue
+;; eww #505) -- constate le 12/08 : fond glassmorphique visible en
+;; permanence meme sans survol. :visible retire completement le widget du
+;; rendu, sans cet artefact (au prix de perdre la petite animation).
 (defwidget preview_box []
   (eventbox :onhoverlost "bash ~/.config/eww/ui.sh unhover"
-    (revealer :reveal {hovered_id != ''} :transition "slidedown" :duration "1ms"
-      (preview_content :mail {digest.by_id[hovered_id] ?: {}}))))
+    (box :visible {hovered_id != ''}
+      (preview_content :mail {(digest.by_id ?: {})[hovered_id] ?: {}}))))
 
 (defwidget preview_content [mail]
   (box :class "panel side" :orientation "v" :space-evenly false
@@ -78,11 +88,11 @@
            :text {mail.reason ?: ''})))
 
 ;; --- Fenetre de detail (clic, fermable) ------------------------------------
-;; Meme architecture "toujours ouverte + revealer" que preview_box, pilotee
-;; par opened_id cette fois. Meme precaution "repli {}" pour l'indexation.
+;; Meme architecture "toujours ouverte + :visible" que preview_box (voir son
+;; commentaire), pilotee par opened_id cette fois.
 (defwidget detail_box []
-  (revealer :reveal {opened_id != ''} :transition "slidedown" :duration "1ms"
-    (detail_content :mail {digest.by_id[opened_id] ?: {}})))
+  (box :visible {opened_id != ''}
+    (detail_content :mail {(digest.by_id ?: {})[opened_id] ?: {}})))
 
 (defwidget detail_content [mail]
   (box :class "panel side" :orientation "v" :space-evenly false
@@ -94,7 +104,7 @@
     (label :class "side-from" :halign "start" :wrap true
            :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
     (label :class "side-badges" :halign "start"
-           :text "${mail.category ?: ''} · ${mail.intent ?: ''} · ${mail.read ? 'lu' : 'non lu'}")
+           :text "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}")
     (label :class "side-reason" :halign "start" :wrap true
            :text {mail.reason ?: ''})
     (box :class "side-sep"
@@ -184,7 +194,8 @@
 (defvar ev_hovered_id "")
 (defvar ev_opened_id  "")
 
-(defpoll events :interval "10m" :initial "{}"
+;; :initial inclut "by_id":{} pour la meme raison que digest ci-dessus.
+(defpoll events :interval "10m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-events.sh")
 
 ;; Une ligne = nom a gauche (tronque), date/heure a droite
@@ -221,12 +232,12 @@
           (event_line :ev ev))))))
 
 ;; --- Apercu au survol (niveau 2 : nom complet, plage, lieu) ----------------
-;; Meme architecture "toujours ouverte + revealer" que preview_box (voir son
-;; commentaire pour le pourquoi), pilotee par ev_hovered_id.
+;; Meme architecture "toujours ouverte + :visible" que preview_box (voir son
+;; commentaire), pilotee par ev_hovered_id.
 (defwidget ev_preview_box []
   (eventbox :onhoverlost "bash ~/.config/eww/ui.sh ev_unhover"
-    (revealer :reveal {ev_hovered_id != ''} :transition "slidedown" :duration "1ms"
-      (ev_preview_content :ev {events.by_id[ev_hovered_id] ?: {}}))))
+    (box :visible {ev_hovered_id != ''}
+      (ev_preview_content :ev {(events.by_id ?: {})[ev_hovered_id] ?: {}}))))
 
 (defwidget ev_preview_content [ev]
   (box :class "panel side" :orientation "v" :space-evenly false
@@ -239,10 +250,10 @@
            :text "⚲ ${ev.location ?: ''}")))
 
 ;; --- Detail au clic (niveau 3 : tout, fermable) ----------------------------
-;; Meme architecture, pilotee par ev_opened_id.
+;; Meme architecture "toujours ouverte + :visible", pilotee par ev_opened_id.
 (defwidget ev_detail_box []
-  (revealer :reveal {ev_opened_id != ''} :transition "slidedown" :duration "1ms"
-    (ev_detail_content :ev {events.by_id[ev_opened_id] ?: {}})))
+  (box :visible {ev_opened_id != ''}
+    (ev_detail_content :ev {(events.by_id ?: {})[ev_opened_id] ?: {}})))
 
 (defwidget ev_detail_content [ev]
   (box :class "panel side" :orientation "v" :space-evenly false

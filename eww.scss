@@ -2,6 +2,12 @@
 
 * { all: unset; }
 
+/* preview/detail/ev_preview/ev_detail restent mappees en permanence
+   (revealer pilote l'affichage du contenu, voir eww.yuck) : sans ceci, le
+   fond par defaut de la fenetre GTK elle-meme (pas celui de ".panel") reste
+   visible en permanence, meme quand le revealer masque tout le contenu. */
+window { background-color: transparent; }
+
 .panel {
   background-color: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);

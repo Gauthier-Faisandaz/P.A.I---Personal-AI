@@ -152,8 +152,10 @@ print(json.dumps({"events":out,
                  ensure_ascii=False))
 '
 
-# Garde-fou : voir fetch-digest.sh. Referme l'apercu agenda par securite a
-# chaque refresh (n'affecte pas la modale de detail ev_opened_id/ev_detail).
+# Garde-fou : voir fetch-digest.sh. Reinitialise juste la variable de survol
+# (le revealer se referme reactivement) a chaque refresh (n'affecte pas la
+# modale de detail ev_opened_id/ev_detail).
+# IMPORTANT : ne JAMAIS faire "eww close ev_preview" ici -- meme raison que
+# pour preview dans fetch-digest.sh.
 EWW="$HOME/.cargo/bin/eww"
 "$EWW" update ev_hovered_id="" >/dev/null 2>&1
-"$EWW" close ev_preview >/dev/null 2>&1
