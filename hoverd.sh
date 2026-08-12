@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ============================================================================
+# OBSOLETE (12/08) : le survol a ete entierement retire (voir eww.yuck).
+# Ce fichier n'est plus appele par start.sh ni par ui.sh. Conserve tel quel
+# uniquement parce que la sandbox utilisee pour le debug ne peut pas
+# supprimer de fichiers dans ce dossier -- a supprimer manuellement
+# (`rm ~/.config/eww/hoverd.sh`) si le survol n'est pas rebati sur cette base.
+# ============================================================================
 # hoverd.sh - demon persistant qui applique les evenements de survol
 # (mail + agenda) dans l'ordre EXACT ou ils arrivent.
 #

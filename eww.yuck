@@ -1,30 +1,34 @@
-;; ~/.config/eww/eww.yuck - Viridis Lab : "digest mail" (survol/clic) + "recommandations" (verre)
-;; Demarrage :  voir start.sh (ouvre recos + digest sur le bon ecran ; preview/detail a la demande)
+;; ~/.config/eww/eww.yuck - Viridis Lab : "digest mail" (clic) + "recommandations" (verre)
+;; Demarrage :  voir start.sh (ouvre toutes les fenetres sur le bon ecran)
 ;; Recharger :  eww reload
+;;
+;; NOTE (12/08) : le survol (apercu au hover) a ete entierement retire.
+;; Il causait des bugs recurrents et jamais totalement resolus (fenetres qui
+;; restent ouvertes, qui ne s'affichent pas, fond glassmorphique fantome
+;; visible en permanence...) malgre plusieurs refontes successives. Seul le
+;; clic (ouverture d'un detail complet, fermable) est conserve : il s'est
+;; montre fiable tout du long. Le survol sera rebati plus tard, proprement,
+;; sur cette base saine.
 
 ;; ==========================================================================
-;;  DIGEST MAIL  (survol = apercu, clic = detail ; auto-refresh 5 min)
+;;  DIGEST MAIL  (clic = detail ; auto-refresh 5 min)
 ;; ==========================================================================
-(defvar hovered_id "")
-(defvar opened_id  "")
+(defvar opened_id "")
 
-;; :initial inclut deja "by_id":{} (defense en profondeur, en plus du repli
-;; "(digest.by_id ?: {})" dans preview_box/detail_box) : sans ca, digest.by_id
-;; vaut null tant que fetch-digest.sh n'a pas rendu son premier resultat, et
-;; indexer [id] dessus plante le rendu -- constate en prod : preview/detail
-;; s'ouvraient AVANT ce premier resultat et ne se sont plus jamais reaffiches.
+;; :initial inclut "by_id":{} : sans ca, digest.by_id vaut null tant que
+;; fetch-digest.sh n'a pas rendu son premier resultat, et indexer [id]
+;; dessus plante le rendu du widget entier ("Unable to index into value
+;; null" dans eww-daemon.out.log) -- constate en prod le 12/08.
 (defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
-;; --- Item : survol -> apercu, clic -> detail -------------------------------
+;; --- Item : clic -> detail ---------------------------------------------
 (defwidget section [label items]
   (box :orientation "v" :space-evenly false :class "section"
     (label :class "sect-label" :halign "start" :text "► ${label}")
     (for it in {items ?: []}
       (eventbox :class "item ${it.mail_id == opened_id ? 'selected' : ''}"
-                :onhover     "bash ~/.config/eww/ui.sh hover '${it.mail_id}'"
-                :onhoverlost "bash ~/.config/eww/ui.sh unhover"
-                :onclick     "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
+                :onclick "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
         (box :orientation "v" :space-evenly false :hexpand true
           (label :class "item-subject ${it.read ? '' : 'nonlu'}"
                  :halign "start" :hexpand true :wrap false
@@ -40,56 +44,22 @@
       (label :class "synced" :halign "end" :text "Synchronisation - ${digest.sync ?: '--:--'}")
       (button :class "sync-icon" :onclick "bash ~/.config/eww/sync.sh digest" "↻"))
     (box :class "sep")
-    ;; garde-fou : si le onhoverlost d'un item est rate (ex: liste redessinee
-    ;; par le refresh pendant le survol), quitter toute la zone referme quand
-    ;; meme l'apercu au lieu de le laisser affiche indefiniment.
-    (eventbox :onhoverlost "bash ~/.config/eww/ui.sh unhover"
-      (box :class "sections" :orientation "v" :space-evenly false :vexpand true
-        (for s in {digest.sections ?: []}
-          (section :label {s.label} :items {s.items}))))))
-
-;; --- Fenetre d'apercu (survol) ---------------------------------------------
-;; ARCHITECTURE : cette fenetre est ouverte UNE SEULE FOIS au demarrage (voir
-;; start.sh) et n'est plus jamais fermee/reouverte pendant l'usage. On a
-;; longtemps pilote son affichage via "eww open"/"eww close" a chaque survol,
-;; mais ce mapping/demapping X11 repete s'est avere peu fiable cote GTK : la
-;; fenetre pouvait rester "active" du point de vue d'eww (verifie via
-;; `eww active-windows`) sans jamais se peindre a l'ecran, surtout en
-;; enchainant plusieurs survols rapproches. Ici, la fenetre reste mappee en
-;; permanence et seul son CONTENU est affiche/masque via un `box :visible`,
-;; pilote reactivement par la variable hovered_id -- une simple mise a jour
-;; de variable, sans plus jamais remapper la fenetre X11 elle-meme.
-;;
-;; IMPORTANT : digest.by_id[hovered_id] vaut null des que hovered_id="" (a
-;; chaque unhover) ou pointe vers un id absent de by_id -- et indexer un
-;; champ (.subject, .from...) sur null plante le RENDU du widget entier
-;; (erreur "Unable to index into value null" dans `eww logs`), contrairement
-;; a ce qu'on pourrait croire : le "?: ''" protege seulement le resultat
-;; final, pas cette etape intermediaire. On calcule donc l'objet une seule
-;; fois avec un repli "{}" AVANT d'aller chercher un champ dessus, dans un
-;; sous-widget dedie.
-;; :visible plutot que revealer : un revealer collapse (:reveal false) peut
-;; garder une trace visuelle/allocation de son dernier rendu sous GTK (issue
-;; eww #505) -- constate le 12/08 : fond glassmorphique visible en
-;; permanence meme sans survol. :visible retire completement le widget du
-;; rendu, sans cet artefact (au prix de perdre la petite animation).
-(defwidget preview_box []
-  (eventbox :onhoverlost "bash ~/.config/eww/ui.sh unhover"
-    (box :visible {hovered_id != ''}
-      (preview_content :mail {(digest.by_id ?: {})[hovered_id] ?: {}}))))
-
-(defwidget preview_content [mail]
-  (box :class "panel side" :orientation "v" :space-evenly false
-    (label :class "side-title" :halign "start" :wrap true
-           :text {mail.subject ?: ''})
-    (label :class "side-from" :halign "start" :wrap true
-           :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
-    (label :class "side-reason" :halign "start" :wrap true
-           :text {mail.reason ?: ''})))
+    (box :class "sections" :orientation "v" :space-evenly false :vexpand true
+      (for s in {digest.sections ?: []}
+        (section :label {s.label} :items {s.items})))))
 
 ;; --- Fenetre de detail (clic, fermable) ------------------------------------
-;; Meme architecture "toujours ouverte + :visible" que preview_box (voir son
-;; commentaire), pilotee par opened_id cette fois.
+;; Fenetre ouverte/fermee reellement (eww open/close) par ui.sh au moment du
+;; clic -- PAS mappee en permanence (constate le 12/08 : une fenetre
+;; transparente mappee en continu, meme contenu masque via :visible, laisse
+;; un fond fantome visible au repos sous ce compositeur). Le :visible
+;; ci-dessous reste une securite supplementaire (contenu nul tant que
+;; opened_id est vide), mais c'est bien l'open/close reel qui evite le fond
+;; fantome. digest.by_id[opened_id] passe par un repli "{}" a CHAQUE niveau
+;; d'indexation (digest.by_id lui meme peut etre null avant le premier
+;; fetch, et digest.by_id[opened_id] peut l'etre aussi si l'id est absent)
+;; avant tout acces a un champ, dans un sous-widget dedie -- sinon le rendu
+;; entier plante.
 (defwidget detail_box []
   (box :visible {opened_id != ''}
     (detail_content :mail {(digest.by_id ?: {})[opened_id] ?: {}})))
@@ -123,18 +93,12 @@
       (button :class "action-btn" "Action 3")
       (button :class "action-btn" "Action 4"))))
 
-;; --- Fenetres digest + laterales -------------------------------------------
+;; --- Fenetres digest + laterale ---------------------------------------------
 (defwindow digest
   :monitor 0
   :geometry (geometry :x "-24px" :y "38%" :width "30%" :height "33%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (digest_box))
-
-(defwindow preview
-  :monitor 0
-  :geometry (geometry :x "-33%" :y "38%" :width "30%" :height "13%" :anchor "top right")
-  :stacking "bg" :windowtype "dock" :wm-ignore false
-  (preview_box))
 
 (defwindow detail
   :monitor 0
@@ -189,22 +153,19 @@
 
 
 ;; ==========================================================================
-;;  AGENDA  (survol = apercu, clic = detail ; auto-refresh 10 min)
+;;  AGENDA  (clic = detail ; auto-refresh 10 min)
 ;; ==========================================================================
-(defvar ev_hovered_id "")
-(defvar ev_opened_id  "")
+(defvar ev_opened_id "")
 
 ;; :initial inclut "by_id":{} pour la meme raison que digest ci-dessus.
 (defpoll events :interval "10m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-events.sh")
 
 ;; Une ligne = nom a gauche (tronque), date/heure a droite
-;; survol -> apercu ; clic -> detail ; highlight persistant sur l'ouvert
+;; clic -> detail ; highlight persistant sur l'ouvert
 (defwidget event_line [ev]
   (eventbox :class "ev-line ${ev.id == ev_opened_id ? 'selected' : ''}"
-            :onhover     "bash ~/.config/eww/ui.sh ev_hover '${ev.id}'"
-            :onhoverlost "bash ~/.config/eww/ui.sh ev_unhover"
-            :onclick     "bash ~/.config/eww/ui.sh ev_open '${ev.id}'"
+            :onclick "bash ~/.config/eww/ui.sh ev_open '${ev.id}'"
     (box :orientation "h" :space-evenly false :hexpand true
       (label :class "ev-name" :halign "start" :hexpand true :wrap false
              :text {ev.name_short ?: '(sans titre)'})
@@ -221,36 +182,16 @@
 
     (box :class "sep")
 
-    ;; garde-fou (voir digest_box) : referme l'apercu si le survol d'un item
-    ;; est rate au moment ou la liste est redessinee.
-    (eventbox :onhoverlost "bash ~/.config/eww/ui.sh ev_unhover"
-      (box :class "sections" :orientation "v" :space-evenly false :vexpand true
-        (label :class "ev-empty" :halign "start" :wrap true
-               :visible {arraylength(events.events ?: []) == 0}
-               :text "Aucun évènement à venir.")
-        (for ev in {events.events ?: []}
-          (event_line :ev ev))))))
+    (box :class "sections" :orientation "v" :space-evenly false :vexpand true
+      (label :class "ev-empty" :halign "start" :wrap true
+             :visible {arraylength(events.events ?: []) == 0}
+             :text "Aucun évènement à venir.")
+      (for ev in {events.events ?: []}
+        (event_line :ev ev)))))
 
-;; --- Apercu au survol (niveau 2 : nom complet, plage, lieu) ----------------
-;; Meme architecture "toujours ouverte + :visible" que preview_box (voir son
-;; commentaire), pilotee par ev_hovered_id.
-(defwidget ev_preview_box []
-  (eventbox :onhoverlost "bash ~/.config/eww/ui.sh ev_unhover"
-    (box :visible {ev_hovered_id != ''}
-      (ev_preview_content :ev {(events.by_id ?: {})[ev_hovered_id] ?: {}}))))
-
-(defwidget ev_preview_content [ev]
-  (box :class "panel side" :orientation "v" :space-evenly false
-    (label :class "side-title" :halign "start" :wrap true
-           :text {ev.name ?: ''})
-    (label :class "side-from" :halign "start" :wrap true
-           :text {ev.range ?: ''})
-    (label :class "side-reason" :halign "start" :wrap true
-           :visible {(ev.location ?: '') != ''}
-           :text "⚲ ${ev.location ?: ''}")))
-
-;; --- Detail au clic (niveau 3 : tout, fermable) ----------------------------
-;; Meme architecture "toujours ouverte + :visible", pilotee par ev_opened_id.
+;; --- Detail au clic (fermable) ----------------------------------------------
+;; Meme architecture (open/close reel par ui.sh) que detail_box, voir son
+;; commentaire, pilotee par ev_opened_id.
 (defwidget ev_detail_box []
   (box :visible {ev_opened_id != ''}
     (ev_detail_content :ev {(events.by_id ?: {})[ev_opened_id] ?: {}})))
@@ -298,18 +239,12 @@
       (button :class "action-btn" "Action 3")
       (button :class "action-btn" "Action 4"))))
 
-;; --- Fenetres agenda + laterales -------------------------------------------
+;; --- Fenetres agenda + laterale ----------------------------------------------
 (defwindow events
   :monitor 0
   :geometry (geometry :x "-24px" :y "74%" :width "25%" :height "22%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (events_box))
-
-(defwindow ev_preview
-  :monitor 0
-  :geometry (geometry :x "-28%" :y "74%" :width "28%" :height "14%" :anchor "top right")
-  :stacking "bg" :windowtype "dock" :wm-ignore false
-  (ev_preview_box))
 
 (defwindow ev_detail
   :monitor 0
