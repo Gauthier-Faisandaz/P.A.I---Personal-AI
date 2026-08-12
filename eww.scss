@@ -2,11 +2,20 @@
 
 * { all: unset; }
 
-/* preview/detail/ev_preview/ev_detail restent mappees en permanence
-   (revealer pilote l'affichage du contenu, voir eww.yuck) : sans ceci, le
-   fond par defaut de la fenetre GTK elle-meme (pas celui de ".panel") reste
-   visible en permanence, meme quand le revealer masque tout le contenu. */
+/* fond par defaut de la fenetre GTK elle-meme (pas celui de ".panel") :
+   sans ceci, il reste visible derriere le contenu transparent des fenetres
+   qui ne remplissent pas tout l'espace (preview/detail/ev_preview/ev_detail,
+   toutes ouvertes/fermees a la demande, jamais mappees en permanence --
+   voir eww.yuck et ui.sh/hoverd.sh). */
 window { background-color: transparent; }
+
+/* NOTE (12/08) : le widget natif `tooltip` a ete essaye pour le survol
+   (infobulle GTK, aucune fenetre a gerer nous-memes) et s'est avere fiable,
+   mais sa fenetre interne n'a pas de canal alpha reel -- pas de vrai
+   glassmorphisme possible dessus, meme avec un ciblage CSS complet
+   (tooltip / tooltip.background / decoration). Abandonne au profit d'une
+   fenetre eww dediee (preview/ev_preview) ouverte/fermee reellement mais
+   rarement -- voir le commentaire en haut de eww.yuck.*/
 
 .panel {
   background-color: rgba(255, 255, 255, 0.1);

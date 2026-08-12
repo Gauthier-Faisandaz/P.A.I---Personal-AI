@@ -1,22 +1,15 @@
 #!/usr/bin/env bash
-# ============================================================================
-# OBSOLETE (12/08) : le survol a ete entierement retire (voir eww.yuck).
-# Ce fichier n'est plus appele par start.sh ni par ui.sh. Conserve tel quel
-# uniquement parce que la sandbox utilisee pour le debug ne peut pas
-# supprimer de fichiers dans ce dossier -- a supprimer manuellement
-# (`rm ~/.config/eww/hoverd.sh`) si le survol n'est pas rebati sur cette base.
-# ============================================================================
 # hoverd.sh - demon persistant qui applique les evenements de survol
 # (mail + agenda) dans l'ordre EXACT ou ils arrivent.
 #
 # Pourquoi ce demon :
 # Chaque entree/sortie de survol declenche un appel independant depuis
-# ui.sh. Si chacun de ces appels faisait directement "eww update" dans son
-# propre process, rien ne garantirait qu'ils s'executent dans l'ordre ou GTK
-# a reellement declenche les evenements (demarrage d'un interprete a cout
-# variable) -- lors d'un survol rapide, un evenement plus ANCIEN pourrait
-# s'appliquer APRES un evenement plus RECENT et laisser l'etat affiche en
-# retard sur la souris.
+# ui.sh. Si chacun de ces appels faisait directement "eww update"/"eww
+# open"/"eww close" dans son propre process, rien ne garantirait qu'ils
+# s'executent dans l'ordre ou GTK a reellement declenche les evenements
+# (demarrage d'un interprete a cout variable) -- lors d'un survol rapide,
+# un evenement plus ANCIEN pourrait s'appliquer APRES un evenement plus
+# RECENT et laisser l'etat affiche en retard sur la souris.
 #
 # Ici, ui.sh ne fait plus qu'ecrire une ligne dans un pipe (ecriture quasi
 # instantanee). Ce demon, lance UNE SEULE fois par start.sh, lit et applique
@@ -24,13 +17,21 @@
 # dernier evenement ecrit est toujours le dernier applique, sans exception
 # possible (un seul lecteur, un seul thread, aucune course).
 #
-# ARCHITECTURE (voir eww.yuck, commentaire au-dessus de preview_box) :
-# preview/detail/ev_preview/ev_detail sont ouvertes UNE SEULE FOIS par
-# start.sh et ne sont plus jamais fermees/reouvertes -- leur affichage est
-# pilote par un `revealer` reactif aux variables hovered_id/ev_hovered_id.
-# Ce demon ne fait donc plus que des "eww update" (plus de "open"/"close"
-# ici), ce qui elimine le remapping X11 repete qui s'averait peu fiable
-# cote GTK (fenetre listee comme active par eww mais jamais peinte).
+# ARCHITECTURE (12/08, voir le commentaire en haut de eww.yuck) :
+# preview/ev_preview ne sont PAS mappees en permanence (fond fantome
+# constate avec cette approche, deux fois, avec des techniques differentes)
+# et ne sont PAS ouvertes/fermees a chaque item survole non plus (peu
+# fiable, meme lentement -- constate a l'iteration 11). Compromis : ce
+# demon n'ouvre REELLEMENT la fenetre qu'au tout premier survol d'une
+# "session" (mail_open/ev_open passe de 0 a 1), et ne la ferme REELLEMENT
+# que quand la souris quitte VRAIMENT toute la liste (plus jamais un
+# nouveau hover juste apres). Entre les deux, passer d'un item a l'autre ne
+# fait qu'un "eww update hovered_id" (pas de remap X11). Grace a la
+# stabilisation anti-rafale ci-dessous, "sortie d'un item + entree sur le
+# suivant" se rassemble deja naturellement en un seul evenement avant meme
+# d'atteindre apply() -- l'ouverture/fermeture reelle redevient donc aussi
+# rare qu'un clic (deja prouve fiable), tout en gardant les transitions
+# rapides instantanees.
 EWW="$HOME/.cargo/bin/eww"
 CACHE="$HOME/.cache/eww"
 FIFO="$CACHE/hover.fifo"
@@ -71,20 +72,39 @@ ew() {
   log "  eww $* -> rc=$rc (${t1}-${t0}=$((t1 - t0))ms)${out:+ | $out}"
 }
 
+mail_open=0
+ev_open=0
+
 apply() {
   local action="$1" id="$2"
-  log "APPLY $action $id"
+  log "APPLY $action $id (mail_open=$mail_open ev_open=$ev_open)"
   case "$action" in
     hover)
       if detail_ouvert; then log "  skip (modale ouverte)"; return; fi
+      if [ "$mail_open" != "1" ]; then
+        ew open preview --screen "$(cat "$CACHE/target_screen" 2>/dev/null)"
+        mail_open=1
+      fi
       ew update hovered_id="$id" ;;
     unhover)
-      ew update hovered_id="" ;;
+      ew update hovered_id=""
+      if [ "$mail_open" = "1" ]; then
+        ew close preview
+        mail_open=0
+      fi ;;
     ev_hover)
       if detail_ouvert; then log "  skip (modale ouverte)"; return; fi
+      if [ "$ev_open" != "1" ]; then
+        ew open ev_preview --screen "$(cat "$CACHE/target_screen" 2>/dev/null)"
+        ev_open=1
+      fi
       ew update ev_hovered_id="$id" ;;
     ev_unhover)
-      ew update ev_hovered_id="" ;;
+      ew update ev_hovered_id=""
+      if [ "$ev_open" = "1" ]; then
+        ew close ev_preview
+        ev_open=0
+      fi ;;
   esac
 }
 
@@ -96,10 +116,11 @@ while IFS=' ' read -r -u 3 action id; do
   # ne veut appliquer que l'etat FINAL (le dernier item reellement survole),
   # pas chaque etape intermediaire. On n'applique un evenement qu'apres
   # ~30ms sans qu'aucun nouveau n'arrive : chaque nouvel evenement relance
-  # l'attente. La variable ne bouge donc plus tant que la souris est encore
-  # en mouvement, et ne change qu'une fois que la souris s'est reellement
-  # arretee -- moins de mises a jour inutiles, et l'etat affiche correspond
-  # toujours a l'endroit ou la souris est vraiment.
+  # l'attente. C'est ce qui fait qu'une transition "sortie d'un item + entree
+  # sur le suivant" (deux evenements bruts) ne produit qu'un SEUL appel a
+  # apply() -- generalement juste "hover(suivant)", jamais "unhover" puis
+  # "hover" separement -- donc jamais de fermeture/reouverture reelle entre
+  # deux items adjacents.
   mail_action=""; mail_id=""
   ev_action="";   ev_id=""
   case "$action" in

@@ -2,17 +2,26 @@
 ;; Demarrage :  voir start.sh (ouvre toutes les fenetres sur le bon ecran)
 ;; Recharger :  eww reload
 ;;
-;; NOTE (12/08) : le survol (apercu au hover) a ete entierement retire.
-;; Il causait des bugs recurrents et jamais totalement resolus (fenetres qui
-;; restent ouvertes, qui ne s'affichent pas, fond glassmorphique fantome
-;; visible en permanence...) malgre plusieurs refontes successives. Seul le
-;; clic (ouverture d'un detail complet, fermable) est conserve : il s'est
-;; montre fiable tout du long. Le survol sera rebati plus tard, proprement,
-;; sur cette base saine.
+;; NOTE (12/08) : le widget natif `tooltip` s'est avere fiable (plus de fond
+;; fantome, plus d'affichage qui rate) mais bloque sur un vrai probleme GTK3 :
+;; la fenetre d'infobulle interne n'a pas de canal alpha reel, impossible a
+;; corriger en CSS -- donc pas de vrai glassmorphisme dessus. Retour a une
+;; fenetre eww dediee (preview/ev_preview), mais avec un changement cle par
+;; rapport aux tentatives precedentes : elle n'est PLUS mappee en permanence
+;; ET n'est PLUS ouverte/fermee a chaque item survole. hoverd.sh ne l'ouvre
+;; reellement qu'au TOUT PREMIER survol d'une "session" (la souris entre
+;; dans la liste), et ne la ferme reellement que quand la souris quitte
+;; VRAIMENT toute la liste -- entre les deux, passer d'un item a l'autre ne
+;; fait qu'un "eww update hovered_id" (pas de remap X11). L'anti-rafale deja
+;; en place dans hoverd.sh fait que "sortie d'un item + entree sur le
+;; suivant" se rassemble deja naturellement en un seul evenement : l'ouverture
+;; et la fermeture reelles redeviennent donc aussi rares qu'un clic (deja
+;; prouve fiable), tout en gardant les transitions rapides instantanees.
 
 ;; ==========================================================================
-;;  DIGEST MAIL  (clic = detail ; auto-refresh 5 min)
+;;  DIGEST MAIL  (survol = apercu, clic = detail ; auto-refresh 5 min)
 ;; ==========================================================================
+(defvar hovered_id "")
 (defvar opened_id "")
 
 ;; :initial inclut "by_id":{} : sans ca, digest.by_id vaut null tant que
@@ -22,13 +31,15 @@
 (defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
-;; --- Item : clic -> detail ---------------------------------------------
+;; --- Item : survol -> apercu, clic -> detail -------------------------------
 (defwidget section [label items]
   (box :orientation "v" :space-evenly false :class "section"
     (label :class "sect-label" :halign "start" :text "► ${label}")
     (for it in {items ?: []}
       (eventbox :class "item ${it.mail_id == opened_id ? 'selected' : ''}"
-                :onclick "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
+                :onhover     "bash ~/.config/eww/ui.sh hover '${it.mail_id}'"
+                :onhoverlost "bash ~/.config/eww/ui.sh unhover"
+                :onclick     "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
         (box :orientation "v" :space-evenly false :hexpand true
           (label :class "item-subject ${it.read ? '' : 'nonlu'}"
                  :halign "start" :hexpand true :wrap false
@@ -44,9 +55,29 @@
       (label :class "synced" :halign "end" :text "Synchronisation - ${digest.sync ?: '--:--'}")
       (button :class "sync-icon" :onclick "bash ~/.config/eww/sync.sh digest" "↻"))
     (box :class "sep")
-    (box :class "sections" :orientation "v" :space-evenly false :vexpand true
-      (for s in {digest.sections ?: []}
-        (section :label {s.label} :items {s.items})))))
+    ;; garde-fou : si le onhoverlost d'un item est rate (ex: liste redessinee
+    ;; par le refresh pendant le survol), quitter toute la zone referme quand
+    ;; meme l'apercu au lieu de le laisser affiche indefiniment.
+    (eventbox :onhoverlost "bash ~/.config/eww/ui.sh unhover"
+      (box :class "sections" :orientation "v" :space-evenly false :vexpand true
+        (for s in {digest.sections ?: []}
+          (section :label {s.label} :items {s.items}))))))
+
+;; --- Fenetre d'apercu (survol) ---------------------------------------------
+;; Ouverte/fermee reellement par hoverd.sh, mais rarement (voir la note en
+;; haut du fichier) -- pas mappee en permanence. Meme precaution
+;; d'indexation que detail_box (repli "{}" a chaque niveau).
+(defwidget preview_box []
+  (preview_content :mail {(digest.by_id ?: {})[hovered_id] ?: {}}))
+
+(defwidget preview_content [mail]
+  (box :class "panel side" :orientation "v" :space-evenly false
+    (label :class "side-title" :halign "start" :wrap true
+           :text {mail.subject ?: ''})
+    (label :class "side-from" :halign "start" :wrap true
+           :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
+    (label :class "side-reason" :halign "start" :wrap true
+           :text {mail.reason ?: ''})))
 
 ;; --- Fenetre de detail (clic, fermable) ------------------------------------
 ;; Fenetre ouverte/fermee reellement (eww open/close) par ui.sh au moment du
@@ -99,6 +130,12 @@
   :geometry (geometry :x "-24px" :y "38%" :width "30%" :height "33%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (digest_box))
+
+(defwindow preview
+  :monitor 0
+  :geometry (geometry :x "-33%" :y "38%" :width "30%" :height "13%" :anchor "top right")
+  :stacking "bg" :windowtype "dock" :wm-ignore false
+  (preview_box))
 
 (defwindow detail
   :monitor 0
@@ -153,8 +190,9 @@
 
 
 ;; ==========================================================================
-;;  AGENDA  (clic = detail ; auto-refresh 10 min)
+;;  AGENDA  (survol = apercu, clic = detail ; auto-refresh 10 min)
 ;; ==========================================================================
+(defvar ev_hovered_id "")
 (defvar ev_opened_id "")
 
 ;; :initial inclut "by_id":{} pour la meme raison que digest ci-dessus.
@@ -162,10 +200,12 @@
   "bash ~/.config/eww/fetch-events.sh")
 
 ;; Une ligne = nom a gauche (tronque), date/heure a droite
-;; clic -> detail ; highlight persistant sur l'ouvert
+;; survol -> apercu ; clic -> detail ; highlight persistant sur l'ouvert
 (defwidget event_line [ev]
   (eventbox :class "ev-line ${ev.id == ev_opened_id ? 'selected' : ''}"
-            :onclick "bash ~/.config/eww/ui.sh ev_open '${ev.id}'"
+            :onhover     "bash ~/.config/eww/ui.sh ev_hover '${ev.id}'"
+            :onhoverlost "bash ~/.config/eww/ui.sh ev_unhover"
+            :onclick     "bash ~/.config/eww/ui.sh ev_open '${ev.id}'"
     (box :orientation "h" :space-evenly false :hexpand true
       (label :class "ev-name" :halign "start" :hexpand true :wrap false
              :text {ev.name_short ?: '(sans titre)'})
@@ -182,12 +222,30 @@
 
     (box :class "sep")
 
-    (box :class "sections" :orientation "v" :space-evenly false :vexpand true
-      (label :class "ev-empty" :halign "start" :wrap true
-             :visible {arraylength(events.events ?: []) == 0}
-             :text "Aucun évènement à venir.")
-      (for ev in {events.events ?: []}
-        (event_line :ev ev)))))
+    ;; garde-fou (voir digest_box) : referme l'apercu si le survol d'un item
+    ;; est rate au moment ou la liste est redessinee.
+    (eventbox :onhoverlost "bash ~/.config/eww/ui.sh ev_unhover"
+      (box :class "sections" :orientation "v" :space-evenly false :vexpand true
+        (label :class "ev-empty" :halign "start" :wrap true
+               :visible {arraylength(events.events ?: []) == 0}
+               :text "Aucun évènement à venir.")
+        (for ev in {events.events ?: []}
+          (event_line :ev ev))))))
+
+;; --- Apercu au survol (niveau 2 : nom complet, plage, lieu) ----------------
+;; Meme architecture (ouverte/fermee reellement, rarement) que preview_box.
+(defwidget ev_preview_box []
+  (ev_preview_content :ev {(events.by_id ?: {})[ev_hovered_id] ?: {}}))
+
+(defwidget ev_preview_content [ev]
+  (box :class "panel side" :orientation "v" :space-evenly false
+    (label :class "side-title" :halign "start" :wrap true
+           :text {ev.name ?: ''})
+    (label :class "side-from" :halign "start" :wrap true
+           :text {ev.range ?: ''})
+    (label :class "side-reason" :halign "start" :wrap true
+           :visible {(ev.location ?: '') != ''}
+           :text "⚲ ${ev.location ?: ''}")))
 
 ;; --- Detail au clic (fermable) ----------------------------------------------
 ;; Meme architecture (open/close reel par ui.sh) que detail_box, voir son
@@ -245,6 +303,12 @@
   :geometry (geometry :x "-24px" :y "74%" :width "25%" :height "22%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (events_box))
+
+(defwindow ev_preview
+  :monitor 0
+  :geometry (geometry :x "-28%" :y "74%" :width "28%" :height "14%" :anchor "top right")
+  :stacking "bg" :windowtype "dock" :wm-ignore false
+  (ev_preview_box))
 
 (defwindow ev_detail
   :monitor 0

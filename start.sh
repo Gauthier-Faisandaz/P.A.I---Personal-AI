@@ -64,12 +64,6 @@ sleep 0.3
 RUST_LOG=debug "$EWW" daemon > "$HOME/.cache/eww/eww-daemon.out.log" 2>&1 &
 sleep 1.5
 
-# Le survol (et le demon hoverd.sh / pipe FIFO qui le pilotait) a ete retire
-# le 12/08 -- voir eww.yuck et ui.sh. Seul le clic subsiste desormais ; il
-# n'a besoin d'aucun demon dedie (un simple "eww update" par ui.sh suffit,
-# pas de risque de course sur un clic comme il y en avait sur un survol).
-pkill -f "bash .*/hoverd\.sh" 2>/dev/null   # au cas ou une vieille instance trainerait
-
 # --- Detection des ecrans connectes (X11 / xrandr) ------------------------
 CONNECTED="$(xrandr --query | grep -w connected)"
 LAPTOP="$(printf  '%s\n' "$CONNECTED" | grep -Ei '^(eDP|LVDS)'        | head -n1 | cut -d' ' -f1)"
@@ -94,20 +88,33 @@ fi
 echo "eww : affichage du dashboard sur l'ecran -> $TARGET"
 echo "$(date '+%F %T') - ecran cible : $TARGET" >> "$LOG"
 
-# Memorise l'ecran cible (utilise plus bas dans ce script)
+# Memorise l'ecran cible (lu par ui.sh ET par hoverd.sh -- doit donc etre
+# ecrit AVANT de lancer hoverd.sh ci-dessous).
 printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
+
+# Demon de survol (voir hoverd.sh) : serialise les evenements hover/unhover
+# pour eviter toute course lors d'un survol rapide, et decide lui-meme quand
+# ouvrir/fermer reellement preview/ev_preview.
+# On tue toute instance precedente avant de relancer : sinon, le verrou
+# interne du demon (flock, pense pour eviter les doublons) empeche une
+# nouvelle version du script de jamais prendre la main -- l'ancienne
+# instance continuerait de tourner indefiniment en arriere-plan.
+pkill -f "bash .*/hoverd\.sh" 2>/dev/null
+sleep 0.3
+: > "$HOME/.cache/eww/ui.log"   # journal cote emetteur (voir ui.sh), repart a zero
+nohup bash "$HOME/.config/eww/hoverd.sh" >/dev/null 2>&1 &
+disown 2>/dev/null
 
 # --- Ouverture des fenetres sur le bon ecran ------------------------------
 # On ferme d'abord (sans erreur si deja ferme) pour que le script soit relançable.
-"$EWW" close recos digest events detail ev_detail 2>/dev/null
+"$EWW" close recos digest events preview detail ev_preview ev_detail 2>/dev/null
 
 "$EWW" open  recos  --screen "$TARGET"
 "$EWW" open  digest --screen "$TARGET"
 "$EWW" open  events --screen "$TARGET"
 
-# detail/ev_detail ne sont PAS ouvertes ici : elles ne le sont qu'a la
-# demande, par ui.sh, au moment du clic (voir son commentaire) -- constate
-# le 12/08 : les garder mappees en permanence (meme avec le contenu masque
-# via :visible) laisse un fond fantome visible au repos sous ce
-# compositeur. Le TARGET est deja enregistre ci-dessus (target_screen),
-# ui.sh s'en sert pour savoir sur quel ecran les ouvrir.
+# preview/detail/ev_preview/ev_detail ne sont PAS ouvertes ici : elles ne le
+# sont qu'a la demande (survol -> hoverd.sh, clic -> ui.sh) -- constate le
+# 12/08 : les garder mappees en permanence laisse un fond fantome visible
+# au repos sous ce compositeur, quelle que soit la technique de masquage du
+# contenu essayee.
