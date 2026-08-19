@@ -1,0 +1,549 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "={{ $('Merge').item.json.data_table_id }}",
+          "mode": "id"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mail_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mail_id": "={{ $json.id }}",
+            "status": "01_downloaded",
+            "mail_content": "={{ $json.text }}",
+            "sender_email": "={{ $json.from.value[0].address }}",
+            "sender_name": "={{ $json.from.value[0].name }}",
+            "mail_title": "={{ $json.cleaned_mail_title }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mail_id",
+              "displayName": "mail_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "mail_title",
+              "displayName": "mail_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sender_name",
+              "displayName": "sender_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sender_email",
+              "displayName": "sender_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "mail_content",
+              "displayName": "mail_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "attachment",
+              "displayName": "attachment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "is_deadline",
+              "displayName": "is_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        -832
+      ],
+      "id": "d18dc1e3-456e-4dc1-a54c-95beb8ad4c3e",
+      "name": "Upsert mail in data table"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": false,
+        "maxResults": 5,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -656,
+        -832
+      ],
+      "id": "1064b3b0-255a-4e27-96a5-6eed43addeb6",
+      "name": "On mail received (poll, 5min)",
+      "retryOnFail": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "SJYvaZ8FZxMkn1xY",
+          "name": "Gmail account (perso)"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        16,
+        -832
+      ],
+      "id": "29178e20-1b00-43e7-96bc-814a24dbfc27",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "22e2c054-ddfc-4ed3-95e1-95c2fc484869",
+              "name": "mail_data_table_name",
+              "value": "PAI_Emails",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -416,
+        -976
+      ],
+      "id": "00643a96-22a4-445d-81ff-68259f620077",
+      "name": "Choose a name for this project's data table"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ynvN87cUejN9DiDK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ynvN87cUejN9DiDK",
+          "cachedResultName": "04_Make_global_summary v4"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mail_data_table_name": "={{ $('Merge').item.json.data_table_id }}"
+          },
+          "matchingColumns": [
+            "mail_data_table_name"
+          ],
+          "schema": [
+            {
+              "id": "mail_data_table_name",
+              "displayName": "mail_data_table_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1136,
+        -832
+      ],
+      "id": "dab99a6d-5904-4a49-8f70-49d52a153022",
+      "name": "Call workflow #4 : make global summary",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "D2ynBJFwI8aublRW",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/D2ynBJFwI8aublRW",
+          "cachedResultName": "03_Summarize_interesting_emails v4"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "mail_data_table_name"
+          ],
+          "schema": [
+            {
+              "id": "data_table_id",
+              "displayName": "data_table_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        912,
+        -832
+      ],
+      "id": "d9213c0a-3154-4db7-907b-a97016b690ee",
+      "name": "Call workflow #3 : summarize Urgent mail",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "TtViQfKqSpWLn8XN",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/TtViQfKqSpWLn8XN",
+          "cachedResultName": "02_Organize_emails v4"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data_table_id": "={{ $('Merge').item.json.data_table_id }}"
+          },
+          "matchingColumns": [
+            "data_table_id"
+          ],
+          "schema": [
+            {
+              "id": "data_table_id",
+              "displayName": "data_table_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        688,
+        -832
+      ],
+      "id": "6819500d-d58f-4a4b-909a-a6fbcd4d338e",
+      "name": "Call workflow #2 : organize mail"
+    },
+    {
+      "parameters": {
+        "content": "Can make it dynamic if we can get the folder, instead of changing it manually when changing version.",
+        "height": 80,
+        "width": 512,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        688,
+        -928
+      ],
+      "id": "5eab869e-2e8a-4bb8-a62a-d5d3a80d8596",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HTpMFe8UdFL8Q3IV",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HTpMFe8UdFL8Q3IV",
+          "cachedResultName": "01-sub_Determine_data_table v4"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "data_table_name": "={{ $json.mail_data_table_name }}"
+          },
+          "matchingColumns": [
+            "data_table_name"
+          ],
+          "schema": [
+            {
+              "id": "data_table_name",
+              "displayName": "data_table_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        -976
+      ],
+      "name": "Call workflow #1 sub : determine data table name",
+      "id": "6bb39a96-4575-48b7-863f-1566ed12dd03",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7b328292-6bf8-4081-a762-9b8aa801f812",
+              "name": "mail_content",
+              "value": "={{ $('Merge').item.json.text.replaceAll(/\\b(?:https?:\\/\\/|www\\.)[^\\s<>\"']+/gi, '[link]') }}",
+              "type": "string"
+            },
+            {
+              "id": "2056d8e0-3f04-426d-9993-4a9b3112440d",
+              "name": "cleaned_mail_title",
+              "value": "={{ $json.subject.trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        -832
+      ],
+      "id": "f371bff6-21c8-4fc1-813d-1b8a12e9e6ee",
+      "name": "Clean mail content (remove URLs)"
+    }
+  ],
+  "connections": {
+    "Upsert mail in data table": {
+      "main": [
+        [
+          {
+            "node": "Call workflow #2 : organize mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On mail received (poll, 5min)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Choose a name for this project's data table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Clean mail content (remove URLs)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose a name for this project's data table": {
+      "main": [
+        [
+          {
+            "node": "Call workflow #1 sub : determine data table name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call workflow #3 : summarize Urgent mail": {
+      "main": [
+        [
+          {
+            "node": "Call workflow #4 : make global summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call workflow #2 : organize mail": {
+      "main": [
+        [
+          {
+            "node": "Call workflow #3 : summarize Urgent mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call workflow #1 sub : determine data table name": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean mail content (remove URLs)": {
+      "main": [
+        [
+          {
+            "node": "Upsert mail in data table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
+  }
+}

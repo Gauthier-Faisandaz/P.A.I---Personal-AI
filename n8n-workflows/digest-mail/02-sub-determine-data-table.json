@@ -1,0 +1,288 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "table",
+        "options": {
+          "filterName": "={{ $json.data_table_name }}"
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        112,
+        -272
+      ],
+      "id": "89c85fa0-1514-4539-b8da-2921b55688c9",
+      "name": "List all data tables",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "={{ $('Start').item.json.data_table_name }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        -368
+      ],
+      "id": "6ae4acbb-a06a-47b1-9e5b-8339d6bd9828",
+      "name": "Create the data table for this project"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8fba2914-9d85-4523-8547-7c7565ae419a",
+              "leftValue": "={{ $('List all data tables').item.json }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        -272
+      ],
+      "id": "3436c9c0-9165-44e4-abeb-eb15f633e3cd",
+      "name": "If the relevant data table does not exist"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "197379ac-cc5d-49bf-9bf5-a6690f72a37d",
+              "name": "data_table_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        -368
+      ],
+      "id": "79ea795c-55f6-4909-ad36-8c9116a3f2e4",
+      "name": "Normalize data table id (created)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "197379ac-cc5d-49bf-9bf5-a6690f72a37d",
+              "name": "data_table_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        -176
+      ],
+      "id": "b8e22c8c-c08c-4817-9c0d-91b6a14f401a",
+      "name": "Normalize data table id (existing)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "399e4d2f-58fc-47d8-b233-e1aa700cb764",
+              "name": "data_table_id",
+              "value": "={{ $json.data_table_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1232,
+        -272
+      ],
+      "id": "4d5081c1-f2ef-438a-b5df-2d4c61932d73",
+      "name": "Normalize (merge) data table id"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "data_table_name"
+            }
+          ]
+        }
+      },
+      "id": "b401417e-73fb-4ba5-bacb-f77d7d4c287c",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -112,
+        -272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "40deeb9c-22eb-4d93-bc5e-b53a082137a5",
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "={{ $('Start').item.json.data_table_name }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        -272
+      ],
+      "id": "1173b82c-41c7-496d-9358-2761ca603894",
+      "name": "Filter only the right data table",
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "List all data tables": {
+      "main": [
+        [
+          {
+            "node": "Filter only the right data table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create the data table for this project": {
+      "main": [
+        [
+          {
+            "node": "Normalize data table id (created)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If the relevant data table does not exist": {
+      "main": [
+        [
+          {
+            "node": "Create the data table for this project",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize data table id (existing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize data table id (created)": {
+      "main": [
+        [
+          {
+            "node": "Normalize (merge) data table id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize data table id (existing)": {
+      "main": [
+        [
+          {
+            "node": "Normalize (merge) data table id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize (merge) data table id": {
+      "main": [
+        []
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "List all data tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter only the right data table": {
+      "main": [
+        [
+          {
+            "node": "If the relevant data table does not exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
+  }
+}

@@ -47,6 +47,10 @@ Configure tes propres URLs de webhooks n8n dans `fetch-digest.sh`, `fetch-events
 
 Relance simplement `start.sh` après un branchement/débranchement d'écran pour repositionner les fenêtres.
 
+## Workflows n8n
+
+Le pipeline n8n qui alimente le panneau **Boîte de réception** (tri des mails par IA, résumé, exposition via webhook) est inclus dans [`n8n-workflows/digest-mail/`](n8n-workflows/digest-mail/) — voir le README de ce dossier pour le détail de chaque étape.
+
 ## Historique
 
 `CHANGELOG.md` retrace en détail la session de debug ayant mené à l'architecture actuelle (démon FIFO anti-rafale, fenêtres pilotées par `revealer` plutôt que ouvertes/fermées à chaque survol).

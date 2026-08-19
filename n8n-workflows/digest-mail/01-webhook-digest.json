@@ -1,0 +1,192 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "c9d179c1-870f-4973-ae04-29f4d2c22766",
+        "authentication": "basicAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d4ebf421-24b8-41cd-a8ea-458daff053e6",
+      "name": "Webhook",
+      "webhookId": "c9d179c1-870f-4973-ae04-29f4d2c22766",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "WMxyACgPZLwlq4Nf",
+          "name": "PAI Desktop Dashboard"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        0
+      ],
+      "id": "aae26f99-5bcf-491c-a893-9f9b6deec19a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lThskgFSZdvWCBJT",
+          "mode": "list",
+          "cachedResultName": "Mail Organizer",
+          "cachedResultUrl": "/projects/G2LsrE7XK5CvmPNi/datatables/lThskgFSZdvWCBJT"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "keyValue": "03_summarized"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "04_mail_read"
+            }
+          ]
+        },
+        "returnAll": true,
+        "orderBy": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "970d5940-65b8-4731-9061-8cf2d0f39fc0",
+      "name": "Get row(s)"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "3552f1ba-1f06-44bd-b861-f84d20738a0d",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a694128e-dc0d-4b74-ab5e-aeaa697e633f",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "urgent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "c11cb0eb-0547-465f-852b-bc5485a0ffb4",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "a_traiter",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "ebed2ac6-a8f8-45e0-94fa-2cd627dc1eac",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "en_attente",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "4395e1b0-1217-44db-8cd0-e43e6a60d89b",
+      "name": "Filter"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
+  }
+}

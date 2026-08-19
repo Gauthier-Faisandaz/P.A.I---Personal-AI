@@ -1,0 +1,734 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        384,
+        80
+      ],
+      "id": "d5edbd32-32a9-4d3e-8891-e994c71af145",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "AMbO71b6uxNhoSAf",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "data_table_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -736,
+        128
+      ],
+      "id": "f0dcd61d-1179-484f-9459-2f9b67da3ead",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "={{ $('When Executed by Another Workflow').item.json.data_table_id ?? 'lThskgFSZdvWCBJT' }}",
+          "mode": "id"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "createdAt",
+              "condition": "gte",
+              "keyValue": "={{ $now.minus(3,'days') }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "02_LLM_processed"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        128
+      ],
+      "id": "811b6200-dc53-409a-9f3b-575618de6de9",
+      "name": "Get mail from data table"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "={{ $('When Executed by Another Workflow').item.json.data_table_id ?? 'lThskgFSZdvWCBJT' }}",
+          "mode": "id"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mail_id",
+              "keyValue": "={{ $json.mail_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "03_summarized",
+            "mail_summary": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mail_id",
+              "displayName": "mail_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mail_title",
+              "displayName": "mail_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sender_name",
+              "displayName": "sender_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "sender_email",
+              "displayName": "sender_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mail_content",
+              "displayName": "mail_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "attachment",
+              "displayName": "attachment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "is_deadline",
+              "displayName": "is_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mail_summary",
+              "displayName": "mail_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1328,
+        -112
+      ],
+      "id": "b48409a2-2402-4223-beea-912ddfb0e16d",
+      "name": "Update data table with LLM output"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        160,
+        32
+      ],
+      "id": "907dd60b-4ef9-4474-8aa0-a440c474ab05",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        32
+      ],
+      "id": "14d82b27-b68d-4761-8228-bfb962ff6883",
+      "name": "Wait 5s",
+      "webhookId": "a12a1967-d36f-44a8-986f-fb59360fea88"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "45312983-c0fd-411e-9d2a-7ce4a6eb53fe",
+              "name": "mail_id",
+              "value": "={{ $('Get mail from data table').item.json.mail_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        -112
+      ],
+      "id": "90c156e3-7497-4ce2-be42-0c5cd06d853c",
+      "name": "Add mail_id to LLM output"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "33ed7b6c-2982-43ab-8232-a26b30374d3a",
+              "name": "system_prompt",
+              "value": "=Tu es un assistant personnel. On te fournit le corps d'un email.\n\nProcède en deux étapes :\n\nÉTAPE 1 — Évalue l'email :\n- Quelle est l'action concrète demandée, s'il y en a une ?\n- L'information est-elle simple (1 fait) ou complexe (plusieurs éléments) ?\n- Choisis le nombre de phrases nécessaires : 1, 2 ou 3. Pas plus.\n\nÉTAPE 2 — Rédige le résumé :\n- 1 phrase si l'email contient un seul fait ou une seule action.\n- 2 phrases si l'email contient une action ET un contexte utile.\n- 3 phrases uniquement si l'email est dense et que chaque phrase apporte une information distincte et actionnable.\n- Commence toujours par l'action ou le fait principal.\n- Pas d'introduction, pas de formule de politesse, pas de \"Cet email indique que...\".\n\nRetourne uniquement le résumé final, sans mentionner l'étape 1.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -512,
+        128
+      ],
+      "id": "72d53b1c-22da-4e7d-b0e5-683cc989101d",
+      "name": "Set system prompt",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "model": "meta-llama/llama-3.3-70b-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        736,
+        176
+      ],
+      "id": "26678616-2c59-4a54-b882-f249507c1f1f",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "QozJssB8za7CmpTq",
+          "name": "OpenRouter account (perso)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "errorMessage": "error"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        80
+      ],
+      "id": "aa92bf9d-0394-4fd2-95ff-d89e64f4af83",
+      "name": "Stop and Error"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "={{ $('When Executed by Another Workflow').item.json.data_table_id ?? 'lThskgFSZdvWCBJT' }}",
+          "mode": "id"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mail_id",
+              "keyValue": "={{ $json.mail_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "03_summarized",
+            "mail_summary": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mail_id",
+              "displayName": "mail_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mail_title",
+              "displayName": "mail_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sender_name",
+              "displayName": "sender_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "sender_email",
+              "displayName": "sender_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mail_content",
+              "displayName": "mail_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "attachment",
+              "displayName": "attachment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "is_deadline",
+              "displayName": "is_deadline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "mail_summary",
+              "displayName": "mail_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        -192
+      ],
+      "id": "70dfc00a-cd7e-40d0-a8ea-83834326c89d",
+      "name": "Update status for non-important mails"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "faf04cb6-843f-48ca-a388-3c33615cde5c",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "ignorer",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -64,
+        128
+      ],
+      "id": "5053f331-6458-40e0-b703-1919986f032b",
+      "name": "If mail's \"ignorer\""
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Voici le corps du mail : {{ $('Get mail from data table').item.json.mail_content }}",
+        "options": {
+          "systemMessage": "={{ $('Set system prompt').item.json.system_prompt }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        384,
+        -96
+      ],
+      "id": "921c8cbc-a81c-4a05-ab4b-d8eb3a0f4c0c",
+      "name": "Summarize interesting mail",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Voici le corps du mail : {{ $('Get mail from data table').item.json.mail_content }}",
+        "options": {
+          "systemMessage": "={{ $('Set system prompt').item.json.system_prompt }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        736,
+        -32
+      ],
+      "id": "ab704c04-0ea5-4931-b197-864a8c195965",
+      "name": "Summarize interesting mail fallback",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize interesting mail",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Set system prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get mail from data table": {
+      "main": [
+        [
+          {
+            "node": "If mail's \"ignorer\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update data table with LLM output": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Summarize interesting mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5s": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add mail_id to LLM output": {
+      "main": [
+        [
+          {
+            "node": "Update data table with LLM output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set system prompt": {
+      "main": [
+        [
+          {
+            "node": "Get mail from data table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize interesting mail fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If mail's \"ignorer\"": {
+      "main": [
+        [
+          {
+            "node": "Update status for non-important mails",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize interesting mail": {
+      "main": [
+        [
+          {
+            "node": "Add mail_id to LLM output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summarize interesting mail fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize interesting mail fallback": {
+      "main": [
+        [
+          {
+            "node": "Add mail_id to LLM output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
+  }
+}
