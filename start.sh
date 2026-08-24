@@ -70,6 +70,17 @@ sleep 1.5
 # pas de risque de course sur un clic comme il y en avait sur un survol).
 pkill -f "bash .*/hoverd\.sh" 2>/dev/null   # au cas ou une vieille instance trainerait
 
+# --- Surveillant anti-blocage (24/08) --------------------------------------
+# Bug upstream confirme (elkowar/eww #451, #255), present meme en 0.6.0 (le
+# plus recent) : le demon peut se bloquer sur "eww open"/"eww close" au clic,
+# meme sans clics rapides. Constate : ni "eww kill" ni "bash start.sh" ne
+# reparent une fenetre bloquee -- seul un "killall eww" (signal direct au
+# process, sans passer par le demon) marche a coup sur. Ce surveillant fait
+# exactement ca automatiquement : voir eww-watchdog.sh pour le detail.
+pkill -f "bash .*/eww-watchdog\.sh" 2>/dev/null
+nohup bash "$HOME/.config/eww/eww-watchdog.sh" >/dev/null 2>&1 &
+disown
+
 # --- Detection des ecrans connectes (X11 / xrandr) ------------------------
 CONNECTED="$(xrandr --query | grep -w connected)"
 LAPTOP="$(printf  '%s\n' "$CONNECTED" | grep -Ei '^(eDP|LVDS)'        | head -n1 | cut -d' ' -f1)"
