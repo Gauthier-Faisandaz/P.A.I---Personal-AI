@@ -39,10 +39,8 @@ full_restart() {
   RUST_LOG=debug "$EWW" daemon > "$CACHE/eww-daemon.out.log" 2>&1 &
   sleep 1.5
   TARGET="$(cat "$CACHE/target_screen" 2>/dev/null)"
-  "$EWW" close recos digest events detail ev_detail 2>/dev/null
-  "$EWW" open recos  --screen "$TARGET" 2>/dev/null
-  "$EWW" open digest --screen "$TARGET" 2>/dev/null
-  "$EWW" open events --screen "$TARGET" 2>/dev/null
+  "$EWW" close colonne detail ev_detail 2>/dev/null
+  "$EWW" open colonne --screen "$TARGET" 2>/dev/null
   log "redemarrage termine"
 }
 

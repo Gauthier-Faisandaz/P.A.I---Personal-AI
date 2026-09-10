@@ -13,7 +13,7 @@
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
 ;;   - variables opened_id / ev_opened_id   -> ui.sh
-;;   - fenetres recos digest events detail ev_detail -> start.sh, ui.sh,
+;;   - fenetres colonne detail ev_detail    -> start.sh, ui.sh,
 ;;     eww-watchdog.sh
 
 
@@ -27,8 +27,13 @@
 ;; widget perso ("can only be used as a child of some container widget") --
 ;; toujours l'envelopper dans un (box ...) cote appelant.
 ;; source = argument passe a sync.sh (digest | recos | events)
+;; :vexpand true sur le panneau lui-meme : dans la colonne (fenetre unique),
+;; c'est ce qui lui fait prendre sa part de la hauteur. Le :vexpand du scroll
+;; ci-dessous ne suffit PAS : eww fixe explicitement vexpand sur chaque
+;; widget, ce qui empeche GTK de le faire remonter d'un enfant a son parent
+;; (constate le 10/09 : sans ca, les 3 panneaux restaient ecrases en haut).
 (defwidget panel [title sync source]
-  (box :class "panel" :orientation "v" :space-evenly false
+  (box :class "panel" :orientation "v" :space-evenly false :vexpand true
     (box :class "header" :orientation "h" :space-evenly false
       (label :class "title" :halign "start" :hexpand true :text title)
       (label :class "synced" :halign "end" :text "Synchronisation - ${sync}")
@@ -219,32 +224,46 @@
 ;; ==========================================================================
 ;;  FENETRES  (toutes : ecran 0 par defaut, --screen impose par start.sh/ui.sh)
 ;; ==========================================================================
-(defwindow recos
-  :monitor 0
-  :geometry (geometry :x "-24px" :y "24px" :width "42%" :height "33%" :anchor "top right")
-  :stacking "bg" :windowtype "dock" :wm-ignore false
-  (recos_box))
 
-(defwindow digest
+;; --- La colonne : UNE seule fenetre pour tous les panneaux (refonte 09/2026)
+;; Pourquoi une seule fenetre : avant, chaque panneau avait la sienne, et
+;; tout changement de taille obligeait a recalculer a la main la geometrie
+;; des autres. Ici les panneaux sont empiles dans une vbox, et c'est GTK qui
+;; repartit la hauteur entre eux, a l'interieur d'une fenetre de hauteur
+;; FIXE (c'est ce qui collera le bandeau en bas, a l'etape 5).
+;;
+;; Geometrie : eww 0.6.0 refuse de melanger les unites dans une meme valeur
+;; ("96%-24px" -> "Invalid unit", teste le 10/09). On garde donc le haut a
+;; 24px comme avant et une hauteur en % : 93% laisse >= 30px sous la
+;; colonne, sur le portable (768) comme sur l'externe (1080), pour le
+;; panneau LXQt masquable. Les % sont relatifs a l'ecran passe par --screen :
+;; la colonne s'adapte seule a l'ecran choisi par start.sh.
+;;
+;; Picom floute TOUTE la surface d'une fenetre Eww (voir picom.conf) : les
+;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
+;; le voile blanc ni la bordure des panneaux.
+(defwindow colonne
   :monitor 0
-  :geometry (geometry :x "-24px" :y "38%" :width "30%" :height "33%" :anchor "top right")
+  :geometry (geometry :x "-24px" :y "24px" :width "33%" :height "93%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (digest_box))
+  (box :class "colonne" :orientation "v" :space-evenly false :spacing 16
+    (recos_box)
+    (digest_box)
+    (events_box)))
 
+;; --- Details (popups au clic, a GAUCHE de la colonne) ---------------------
+;; x = -36% : la colonne occupe 33% + 24px depuis le bord droit (~35%), on
+;; se place juste a sa gauche. Temporaire : le detail mail passera DANS la
+;; colonne a l'etape 7, et ev_detail disparaitra avec le panneau A VENIR
+;; (etape 6).
 (defwindow detail
   :monitor 0
-  :geometry (geometry :x "-33%" :y "38%" :width "30%" :height "33%" :anchor "top right")
+  :geometry (geometry :x "-36%" :y "38%" :width "30%" :height "33%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (detail_box))
 
-(defwindow events
-  :monitor 0
-  :geometry (geometry :x "-24px" :y "74%" :width "25%" :height "22%" :anchor "top right")
-  :stacking "bg" :windowtype "dock" :wm-ignore false
-  (events_box))
-
 (defwindow ev_detail
   :monitor 0
-  :geometry (geometry :x "-28%" :y "56%" :width "28%" :height "40%" :anchor "top right")
+  :geometry (geometry :x "-36%" :y "56%" :width "28%" :height "40%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (ev_detail_box))

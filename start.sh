@@ -108,13 +108,13 @@ echo "$(date '+%F %T') - ecran cible : $TARGET" >> "$LOG"
 # Memorise l'ecran cible (utilise plus bas dans ce script)
 printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
 
-# --- Ouverture des fenetres sur le bon ecran ------------------------------
-# On ferme d'abord (sans erreur si deja ferme) pour que le script soit relançable.
-"$EWW" close recos digest events detail ev_detail 2>/dev/null
+# --- Ouverture de la colonne sur le bon ecran -----------------------------
+# Depuis la refonte (09/2026), tout le dashboard tient dans UNE seule
+# fenetre, "colonne" (voir eww.yuck). On ferme d'abord (sans erreur si deja
+# ferme) pour que le script soit relançable.
+"$EWW" close colonne detail ev_detail 2>/dev/null
 
-"$EWW" open  recos  --screen "$TARGET"
-"$EWW" open  digest --screen "$TARGET"
-"$EWW" open  events --screen "$TARGET"
+"$EWW" open  colonne --screen "$TARGET"
 
 # detail/ev_detail ne sont PAS ouvertes ici : elles ne le sont qu'a la
 # demande, par ui.sh, au moment du clic (voir son commentaire) -- constate
