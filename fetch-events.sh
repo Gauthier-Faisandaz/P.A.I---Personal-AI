@@ -144,9 +144,23 @@ for i,ev in enumerate(events(raw)):
     })
 
 out.sort(key=lambda e:e["_k"])
+
+# resume = texte affiche tel quel dans l en-tete du panneau (replie ou non).
+# Provisoire : a l etape 6, le panneau A VENIR recevra son resume tout fait
+# depuis n8n (retard / aujourd hui / demain, taches comprises).
+auj=datetime.date.today()
+dem=auj+datetime.timedelta(days=1)
+n_auj=sum(1 for e in out if e["_k"][:10]==auj.isoformat())
+n_dem=sum(1 for e in out if e["_k"][:10]==dem.isoformat())
+parts=[]
+if n_auj: parts.append(f"{n_auj} aujourd\x27hui")
+if n_dem: parts.append(f"{n_dem} demain")
+resume=" · ".join(parts) or (f"{len(out)} à venir" if out else "rien à venir")
+
 for e in out: e.pop("_k",None)
 
 print(json.dumps({"events":out,
+                  "resume":resume,
                   "by_id":{e["id"]:e for e in out},
                   "sync":datetime.datetime.now().strftime("%H:%M")},
                  ensure_ascii=False))

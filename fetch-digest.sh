@@ -59,7 +59,11 @@ for it in items:
     buckets.setdefault(b,[]).append(it)
 sections=[{"label":LABELS[c],"items":buckets[c]} for c in ("a_traiter","en_attente") if buckets.get(c)]
 by_id={it["mail_id"]:it for it in items if it["mail_id"]}
-print(json.dumps({"sections":sections,"by_id":by_id,
+# resume = texte affiche tel quel dans l en-tete du panneau (replie ou non) :
+# nombre de mails A TRAITER (urgents compris, meme regroupement que ci-dessus).
+n=len(buckets.get("a_traiter",[]))
+resume=f"{n} à traiter" if n else "rien à traiter"
+print(json.dumps({"sections":sections,"by_id":by_id,"resume":resume,
                   "sync":datetime.datetime.now().strftime("%H:%M")},ensure_ascii=False))
 '
 

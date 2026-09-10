@@ -34,6 +34,8 @@
 ;; toujours l'envelopper dans un (box ...) cote appelant.
 ;; id     = nom du panneau dans l'accordeon (reco | venir | mail)
 ;; source = argument passe a sync.sh (digest | recos | events)
+;; resume = texte court affiche a droite de l'en-tete ("8 à traiter"...),
+;;          pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
 ;;
 ;; Deplie / replie (teste le 10/09 sur eww 0.6.0) :
 ;;  - :visible false sur le corps le masque ET libere sa place (comportement
@@ -43,7 +45,7 @@
 ;;    leur en-tete. Il faut le mettre sur le panneau lui-meme : eww fixe
 ;;    explicitement vexpand sur chaque widget, ce qui empeche GTK de le faire
 ;;    remonter du scroll interieur vers le panneau.
-(defwidget panel [id title sync source]
+(defwidget panel [id title sync source resume]
   (box :class "panel" :orientation "v" :space-evenly false :vexpand {ouvert == id}
     ;; En-tete : clic -> ui.sh panneau <id> plutot qu'un simple "eww update",
     ;; pour que le clic sur le panneau DEJA ouvert soit sans effet et que les
@@ -56,13 +58,18 @@
       (box :class "header" :orientation "h" :space-evenly false
         (label :class "chevron" :text {ouvert == id ? "▾" : "▸"})
         (label :class "title" :halign "start" :hexpand true :text title)
-        (label :class "synced" :halign "end" :text "Synchronisation - ${sync}")
+        ;; Resume : toujours visible. Heure de synchro + bouton ↻ : panneau
+        ;; ouvert seulement (633px ne suffisent pas pour tout afficher sur
+        ;; chaque en-tete ; un panneau replie se rafraichit quand meme tout
+        ;; seul via son defpoll).
+        (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
+        (label :class "synced" :halign "end" :visible {ouvert == id} :text "sync ${sync}")
         ;; :timeout "15s" : eww TUE une commande onclick au bout de son
         ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
         ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
         ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
         ;; d'avoir mis a jour le panneau.
-        (button :class "sync-icon" :timeout "15s"
+        (button :class "sync-icon" :timeout "15s" :visible {ouvert == id}
                 :onclick "bash ~/.config/eww/sync.sh ${source}" "↻")))
     ;; Corps : visible uniquement sur le panneau ouvert.
     (box :orientation "v" :space-evenly false :vexpand true :visible {ouvert == id}
@@ -127,6 +134,7 @@
 
 (defwidget digest_box []
   (panel :id "mail" :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
+         :resume {digest.resume ?: ''}
     (box :orientation "v" :space-evenly false
       (for s in {digest.sections ?: []}
         (section :label {s.label} :items {s.items})))))
@@ -181,7 +189,8 @@
            :text {reco.detail ?: ''})))
 
 (defwidget recos_box []
-  (panel :id "reco" :title "RECOMMANDATIONS DU JOUR" :sync {recos.sync ?: '--:--'} :source "recos"
+  (panel :id "reco" :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
+         :resume {recos.resume ?: ''}
     (label :class "reco-empty" :halign "start" :wrap true
            :visible {arraylength(recos.recommandations ?: []) == 0}
            :text "Aucune recommandation pour le moment.")
@@ -213,6 +222,7 @@
 (defwidget events_box []
   ;; id "venir" : ce panneau deviendra "À VENIR" (agenda + taches) a l'etape 6
   (panel :id "venir" :title "AGENDA" :sync {events.sync ?: '--:--'} :source "events"
+         :resume {events.resume ?: ''}
     (label :class "ev-empty" :halign "start" :wrap true
            :visible {arraylength(events.events ?: []) == 0}
            :text "Aucun évènement à venir.")

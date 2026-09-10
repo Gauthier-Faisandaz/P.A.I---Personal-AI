@@ -51,7 +51,14 @@ except Exception:
     raw = {}
 
 items = [norm(e) for e in find_list(raw)]
+# resume = texte affiche tel quel dans l en-tete du panneau (replie ou non).
+# Calcule ici plutot que dans eww.yuck : eww reste un rendu bete.
+n = len(items)
+if n == 0:   resume = "aucune action"
+elif n == 1: resume = "1 action"
+else:        resume = f"{n} actions"
 out = {"recommandations": items,
+       "resume": resume,
        "sync": datetime.datetime.now().strftime("%H:%M")}
 print(json.dumps(out, ensure_ascii=False))
 '
