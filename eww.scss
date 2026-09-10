@@ -19,6 +19,15 @@ window { background-color: transparent; }
 
 .header { margin-bottom: 4px; }
 .title  { font-weight: bold; }
+
+/* accordeon : chevron (ferme / ouvert) devant le titre, en-tete cliquable.
+   ATTENTION : ce fichier doit rester 100% ASCII, commentaires compris. Un
+   seul caractere non ASCII et le compilateur sass ajoute '@charset "UTF-8";'
+   en tete du CSS, regle que GTK refuse ("unknown @ rule") : TOUTE la feuille
+   de style saute (constate le 10/09). */
+.chevron { margin-right: 8px; }
+.panel-head:hover .title,
+.panel-head:hover .chevron { color: #8ecae6; }
 .synced { font-size: 12px; color: white; }
 
 .sep {

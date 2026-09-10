@@ -16,6 +16,23 @@ EWW="$HOME/.cargo/bin/eww"
 TARGET="$(cat "$HOME/.cache/eww/target_screen" 2>/dev/null)"
 
 case "$1" in
+  panneau)
+    # Clic sur l'en-tete d'un panneau de la colonne (accordeon, voir
+    # "defvar ouvert" dans eww.yuck). $2 = reco | venir | mail.
+    # Panneau deja ouvert : sans effet (pas d'etat "tout replie").
+    [ "$("$EWW" get ouvert)" = "$2" ] && exit 0
+    "$EWW" update ouvert="$2"
+    # Un detail reste ouvert a cote d'un panneau qui vient de se replier
+    # n'aurait plus de sens : on le ferme (seulement s'il est ouvert, pour
+    # ne pas multiplier les "eww close" inutiles).
+    if [ -n "$("$EWW" get opened_id)" ]; then
+      "$EWW" close detail 2>/dev/null
+      "$EWW" update opened_id=""
+    fi
+    if [ -n "$("$EWW" get ev_opened_id)" ]; then
+      "$EWW" close ev_detail 2>/dev/null
+      "$EWW" update ev_opened_id=""
+    fi ;;
   open)
     "$EWW" update ev_opened_id=""
     "$EWW" close ev_detail 2>/dev/null
