@@ -36,6 +36,9 @@
 ;; source = argument passe a sync.sh (digest | recos | events)
 ;; resume = texte court affiche a droite de l'en-tete ("8 à traiter"...),
 ;;          pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
+;; semi   = phrase affichee sous l'en-tete quand le panneau est REPLIE
+;;          (etat "semi-ouvert"). "" = pas de ligne : seul le panneau
+;;          recommandations en fournit une (champ "synthese" du JSON)
 ;;
 ;; Deplie / replie (teste le 10/09 sur eww 0.6.0) :
 ;;  - :visible false sur le corps le masque ET libere sa place (comportement
@@ -45,7 +48,7 @@
 ;;    leur en-tete. Il faut le mettre sur le panneau lui-meme : eww fixe
 ;;    explicitement vexpand sur chaque widget, ce qui empeche GTK de le faire
 ;;    remonter du scroll interieur vers le panneau.
-(defwidget panel [id title sync source resume]
+(defwidget panel [id title sync source resume semi]
   (box :class "panel" :orientation "v" :space-evenly false :vexpand {ouvert == id}
     ;; En-tete : clic -> ui.sh panneau <id> plutot qu'un simple "eww update",
     ;; pour que le clic sur le panneau DEJA ouvert soit sans effet et que les
@@ -71,6 +74,13 @@
         ;; d'avoir mis a jour le panneau.
         (button :class "sync-icon" :timeout "15s" :visible {ouvert == id}
                 :onclick "bash ~/.config/eww/sync.sh ${source}" "↻")))
+    ;; Ligne semi-ouverte : panneau replie + phrase non vide. :wrap true
+    ;; coupe entre deux mots ; :lines 2 + :truncate true bornent a DEUX
+    ;; lignes (termine par "…" si la phrase est trop longue) -- teste le
+    ;; 10/09 sur eww 0.6.0 : sans :lines, une phrase longue prend 3 lignes.
+    (label :class "synthese" :halign "start" :xalign 0
+           :wrap true :lines 2 :truncate true
+           :visible {ouvert != id && semi != ''} :text semi)
     ;; Corps : visible uniquement sur le panneau ouvert.
     (box :orientation "v" :space-evenly false :vexpand true :visible {ouvert == id}
       (box :class "sep")
@@ -134,7 +144,7 @@
 
 (defwidget digest_box []
   (panel :id "mail" :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
-         :resume {digest.resume ?: ''}
+         :resume {digest.resume ?: ''} :semi ""
     (box :orientation "v" :space-evenly false
       (for s in {digest.sections ?: []}
         (section :label {s.label} :items {s.items})))))
@@ -175,7 +185,9 @@
 ;; ==========================================================================
 ;;  RECOMMANDATIONS DU JOUR  (auto-refresh 20 min)
 ;; ==========================================================================
-(defpoll recos :interval "20m" :initial "{}"
+;; :initial avec une synthese : avant la 1re reponse de n8n, la ligne
+;; semi-ouverte affiche "Chargement…" au lieu de disparaitre.
+(defpoll recos :interval "20m" :initial "{\"synthese\":\"Chargement…\"}"
   "bash ~/.config/eww/fetch-recos.sh")
 
 (defwidget reco_card [reco]
@@ -190,7 +202,7 @@
 
 (defwidget recos_box []
   (panel :id "reco" :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
-         :resume {recos.resume ?: ''}
+         :resume {recos.resume ?: ''} :semi {recos.synthese ?: ''}
     (label :class "reco-empty" :halign "start" :wrap true
            :visible {arraylength(recos.recommandations ?: []) == 0}
            :text "Aucune recommandation pour le moment.")
@@ -222,7 +234,7 @@
 (defwidget events_box []
   ;; id "venir" : ce panneau deviendra "À VENIR" (agenda + taches) a l'etape 6
   (panel :id "venir" :title "AGENDA" :sync {events.sync ?: '--:--'} :source "events"
-         :resume {events.resume ?: ''}
+         :resume {events.resume ?: ''} :semi ""
     (label :class "ev-empty" :halign "start" :wrap true
            :visible {arraylength(events.events ?: []) == 0}
            :text "Aucun évènement à venir.")

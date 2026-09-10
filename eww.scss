@@ -32,6 +32,14 @@ window { background-color: transparent; }
    precede dans l'en-tete (12px trop serre, retour utilisateur 10/09) */
 .synced { font-size: 12px; color: white; margin-left: 28px; }
 
+/* ligne semi-ouverte des recommandations (panneau replie) : alignee sous
+   le titre (apres le chevron), un peu plus petite que le corps */
+.synthese {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 6px 0 0 20px;
+}
+
 /* resume a droite de l'en-tete ("8 a traiter"...), visible replie ou non */
 .resume { font-size: 13px; color: rgba(255, 255, 255, 0.75); margin-left: 12px; }
 
