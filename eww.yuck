@@ -272,6 +272,43 @@
 
 
 ;; ==========================================================================
+;;  BANDEAU  (bas de la colonne : une ligne fixe, jamais depliable)
+;; ==========================================================================
+;; Tout est calcule en local, sans n8n :
+;;  - horloge : 10 s suffisent, l'heure n'affiche que les minutes.
+;;  - vrac    : taches Taskwarrior sans date (voir fetch-vrac.sh). 1 min.
+;;  - sys     : CPU / RAM / reseau en % (voir fetch-sys.sh, et pourquoi pas
+;;              les variables magiques EWW_CPU & co). 5 s.
+(defpoll horloge :interval "10s" :initial ""
+  "LC_TIME=fr_FR.UTF-8 date '+%a %-d %b · %H:%M'")
+
+(defpoll vrac :interval "1m" :initial "{\"texte\":\"\"}"
+  "bash ~/.config/eww/fetch-vrac.sh")
+
+(defpoll sys :interval "5s" :initial "{\"cpu\":0,\"ram\":0,\"net\":0}"
+  "bash ~/.config/eww/fetch-sys.sh")
+
+;; --- Jauge : nom + barre (widget progress, valeur 0-100) -------------------
+;; Le style des barres (fond + remplissage) est dans eww.scss : sans lui,
+;; "* { all: unset; }" les rendrait invisibles.
+(defwidget jauge [nom valeur]
+  (box :class "jauge" :orientation "h" :space-evenly false :spacing 6
+    (label :class "jauge-nom" :text nom)
+    (progress :class "barre" :valign "center" :orientation "h" :value valeur)))
+
+(defwidget bandeau []
+  (box :class "bandeau" :orientation "h" :space-evenly false
+    (label :class "horloge" :text horloge)
+    (label :class "bandeau-sep" :visible {(vrac.texte ?: '') != ''} :text "│")
+    (label :class "vrac" :visible {(vrac.texte ?: '') != ''} :text {vrac.texte ?: ''})
+    ;; boite vide extensible : pousse les jauges contre le bord droit
+    (box :hexpand true)
+    (jauge :nom "CPU" :valeur {sys.cpu ?: 0})
+    (jauge :nom "RAM" :valeur {sys.ram ?: 0})
+    (jauge :nom "NET" :valeur {sys.net ?: 0})))
+
+
+;; ==========================================================================
 ;;  FENETRES  (toutes : ecran 0 par defaut, --screen impose par start.sh/ui.sh)
 ;; ==========================================================================
 
@@ -301,7 +338,11 @@
   (box :class "colonne" :orientation "v" :space-evenly false :spacing 16
     (recos_box)
     (events_box)
-    (digest_box)))
+    (digest_box)
+    ;; Dernier enfant : comme la fenetre a une hauteur FIXE et que le panneau
+    ;; ouvert absorbe toute la place libre (:vexpand), le bandeau reste colle
+    ;; en bas quel que soit le panneau ouvert.
+    (bandeau)))
 
 ;; --- Details (popups au clic, a GAUCHE de la colonne) ---------------------
 ;; x = -36% : la colonne occupe 33% + 24px depuis le bord droit (~35%), on
