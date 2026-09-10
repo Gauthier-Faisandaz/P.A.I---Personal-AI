@@ -37,7 +37,12 @@
     (box :class "header" :orientation "h" :space-evenly false
       (label :class "title" :halign "start" :hexpand true :text title)
       (label :class "synced" :halign "end" :text "Synchronisation - ${sync}")
-      (button :class "sync-icon" :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
+      ;; :timeout "15s" : eww TUE une commande onclick au bout de son timeout,
+      ;; 200ms par defaut (verifie dans le source 0.6.0, run_command ->
+      ;; child.kill()). sync.sh fait un curl vers n8n (>= 0.45s, --max-time 8)
+      ;; : sans ce timeout, il etait tue avant d'avoir mis a jour le panneau.
+      (button :class "sync-icon" :timeout "15s"
+              :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
     (box :class "sep")
     ;; Taille FIXE : la geometry de la fenetre n'est qu'un minimum pour GTK,
     ;; qui agrandit la fenetre si le contenu deborde. Le scroll (vertical

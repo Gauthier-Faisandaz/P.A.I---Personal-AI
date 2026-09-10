@@ -58,8 +58,27 @@ fi
 # depuis : soit eww logue sur stdout/stderr (qu'on jetait jusqu'ici avec
 # >/dev/null), soit son propre mecanisme de log est peu fiable. Dans les
 # deux cas, mieux vaut avoir notre propre capture.
-"$EWW" kill 2>/dev/null
-sleep 0.3
+#
+# Garantie "un seul demon" (10/09) : "eww kill" est une commande IPC, qu'un
+# demon bloque ignore (meme constat que dans eww-watchdog.sh). Constate au
+# rebranchement de l'ecran HDMI : l'ancien demon a survecu, un second a ete
+# lance a cote, et l'ancienne colonne est restee affichee sur le portable.
+# Donc : "eww kill" poli (borne a 2s), on attend jusqu'a 2s que le process
+# disparaisse, et s'il est encore la on le tue directement (kill -9).
+# -x eww = processus dont le NOM est exactement "eww" (le binaire : demon et
+# clients open/close eventuellement bloques). Surtout pas "pkill -f '/eww '"
+# : ca tuerait aussi tout process dont la ligne de commande contient
+# "~/.config/eww " (un terminal, un editeur...) -- constate le 10/09.
+timeout 2 "$EWW" kill 2>/dev/null
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  pgrep -x eww >/dev/null || break
+  sleep 0.2
+done
+if pgrep -x eww >/dev/null; then
+  echo "$(date '+%F %T') - demon eww sourd a 'eww kill', kill -9" >> "$LOG"
+  pkill -9 -x eww 2>/dev/null
+  sleep 0.3
+fi
 : > "$HOME/.cache/eww/eww-daemon.out.log"
 RUST_LOG=debug "$EWW" daemon > "$HOME/.cache/eww/eww-daemon.out.log" 2>&1 &
 sleep 1.5
