@@ -27,6 +27,12 @@ window { background-color: transparent; }
   margin: 6px 0 12px 0;
 }
 
+/* defilement vertical des panneaux a taille fixe (widget "panel" de eww.yuck) :
+   "* { all: unset; }" rend sinon la barre invisible */
+scrollbar { background-color: transparent; }
+scrollbar slider { min-width: 4px; background-color: rgba(255, 255, 255, 0.30); }
+scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
+
 .section    { margin-bottom: 12px; }
 .sect-label { font-weight: bold; }
 .sect-item  { color: white; }

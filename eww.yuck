@@ -34,8 +34,13 @@
       (label :class "synced" :halign "end" :text "Synchronisation - ${sync}")
       (button :class "sync-icon" :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
     (box :class "sep")
-    (box :class "sections" :orientation "v" :space-evenly false :vexpand true
-      (children))))
+    ;; Taille FIXE : la geometry de la fenetre n'est qu'un minimum pour GTK,
+    ;; qui agrandit la fenetre si le contenu deborde. Le scroll (vertical
+    ;; seulement) absorbe le surplus en hauteur ; les labels non wrappes
+    ;; ont :truncate true pour ne pas elargir la fenetre.
+    (scroll :class "sections" :vscroll true :hscroll false :vexpand true
+      (box :orientation "v" :space-evenly false
+        (children)))))
 
 ;; --- Panneau lateral de detail : titre + bouton ✕, puis le contenu -------
 (defwidget side_panel [title onclose]
@@ -77,9 +82,9 @@
             :onclick "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
     (box :orientation "v" :space-evenly false :hexpand true
       (label :class "item-subject ${it.read ? '' : 'nonlu'}"
-             :halign "start" :hexpand true :wrap false
+             :halign "start" :hexpand true :wrap false :truncate true
              :text "  ${it.urgent ? '⚠ ' : ''}${it.read ? '' : '● '}${it.subject_short}")
-      (label :class "item-meta" :halign "start" :visible {it.meta != ''}
+      (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
              :text "      ${it.meta}"))))
 
 (defwidget section [label items]
@@ -168,7 +173,7 @@
   (eventbox :class "ev-line ${ev.id == ev_opened_id ? 'selected' : ''}"
             :onclick "bash ~/.config/eww/ui.sh ev_open '${ev.id}'"
     (box :orientation "h" :space-evenly false :hexpand true
-      (label :class "ev-name" :halign "start" :hexpand true :wrap false
+      (label :class "ev-name" :halign "start" :hexpand true :wrap false :truncate true
              :text {ev.name_short ?: '(sans titre)'})
       (label :class "ev-when" :halign "end" :wrap false
              :text {ev.when ?: ''}))))
