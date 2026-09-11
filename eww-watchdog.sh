@@ -39,7 +39,13 @@ full_restart() {
   # potentiellement ignore par un demon bloque, voir plus haut). Ceci tue
   # le demon ET tout client "eww open/close" fantome en un seul coup,
   # exactement comme le "killall eww" manuel qui a toujours fonctionne.
-  pkill -9 -f "/eww " 2>/dev/null
+  # -x eww = process dont le NOM est exactement "eww" (le binaire), comme
+  # dans start.sh. Surtout pas "pkill -f '/eww '" (version precedente) :
+  # -f cherche dans la ligne de commande COMPLETE, et tuait donc aussi tout
+  # process qui contenait "~/.config/eww " -- un terminal, un editeur, un
+  # script (constate le 11/09 : une commande lancee par "cd ~/.config/eww
+  # && ..." a ete tuee en plein milieu lors d'un redemarrage).
+  pkill -9 -x eww 2>/dev/null
   sleep 0.5
   : > "$CACHE/eww-daemon.out.log"
   RUST_LOG=debug "$EWW" daemon > "$CACHE/eww-daemon.out.log" 2>&1 &
@@ -54,7 +60,12 @@ while true; do
   # etimes (secondes ecoulees) + ligne de commande de chaque process eww en
   # cours ; on ne cible que "open"/"close" (jamais "daemon", qui doit
   # rester vivant en continu).
-  stuck="$(ps -eo pid,etimes,args 2>/dev/null | grep -E '/eww (open|close) ' | grep -v grep | awk '$2 >= 4')"
+  # -C eww : seulement les process dont le NOM est "eww" (le binaire).
+  # Avant, on fouillait la ligne de commande de TOUS les process : un
+  # script ou un terminal dont la commande contenait "/eww open" depuis
+  # 4 s aurait declenche un redemarrage pour rien. (Le "=" apres chaque
+  # colonne supprime la ligne d'en-tete de ps.)
+  stuck="$(ps -C eww -o pid=,etimes=,args= 2>/dev/null | grep -E '/eww (open|close) ' | awk '$2 >= 4')"
   if [ -n "$stuck" ]; then
     log "detecte : $stuck"
     full_restart
