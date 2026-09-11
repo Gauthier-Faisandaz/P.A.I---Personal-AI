@@ -155,6 +155,10 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 .item.selected { background-color: rgba(255, 255, 255, 0.20); }
 .item-subject { color: white; }
 .item-subject.nonlu { font-weight: bold; }
+/* "!" devant un mail urgent : toujours en gras, lu ou non. 9px = un
+   caractere en 15px, l'ecart avant le sujet (eww supprime les espaces en
+   tete d'un label : pas d'espace dans le texte). */
+.item-urgent { font-weight: bold; margin-right: 9px; }
 .item-meta { font-size: $police-meta; color: rgba(255, 255, 255, 0.55); }
 
 /* --- Modale mail (fenetre "modale", repris du commit 8c5b890) ---------- */

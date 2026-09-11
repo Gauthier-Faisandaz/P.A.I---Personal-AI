@@ -220,7 +220,9 @@
 ;;     comme tout le titre) a la place de ►. Essayes puis ecartes (retours
 ;;     utilisateur 11/09) : le rouge, puis ⚠ -- glyphe d'une police de
 ;;     secours, trop fin, il se voyait mal. "!" est un caractere de DejaVu
-;;     Sans Mono : meme epaisseur que le texte, meme largeur que ►.
+;;     Sans Mono : meme epaisseur que le texte, meme largeur que ►. C'est
+;;     aussi le signe des mails urgents (mail_item) : un seul code visuel
+;;     pour "attention" dans tout le dashboard.
 (defwidget venir_groupe [g]
   (box :class "section" :orientation "v" :space-evenly false
     (label :class "sect-label venir-${g.cle}" :halign "start"
@@ -271,9 +273,15 @@
   (eventbox :class "item ${it.mail_id == mail_modale ? 'selected' : ''}"
             :onclick "setsid -f bash ~/.config/eww/ui.sh open mail '${it.mail_id}' >/dev/null 2>&1"
     (box :class "item-corps" :orientation "v" :space-evenly false :hexpand true
-      (label :class "item-subject ${it.read ? '' : 'nonlu'}"
-             :halign "start" :hexpand true :wrap false :truncate true
-             :text "  ${it.urgent ? '⚠ ' : ''}${it.read ? '' : '● '}${it.subject_short}")
+      ;; "!" des mails urgents : label a part pour etre TOUJOURS en gras (le
+      ;; sujet ne l'est que non lu). Meme signe que le groupe EN RETARD d'A
+      ;; VENIR ; remplace ⚠, trop fin (police de secours). Une seule ligne
+      ;; de 18px : hauteur inchangee pour mise-en-page.py.
+      (box :orientation "h" :space-evenly false :hexpand true
+        (label :class "item-urgent" :visible {it.urgent} :text "!")
+        (label :class "item-subject ${it.read ? '' : 'nonlu'}"
+               :halign "start" :hexpand true :wrap false :truncate true
+               :text "${it.read ? '' : '● '}${it.subject_short}"))
       (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
              :text "      ${it.meta}"))))
 
