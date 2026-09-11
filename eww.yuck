@@ -216,9 +216,17 @@
 
 ;; --- Groupe : titre ("► EN RETARD · 1"), puis ses lignes. Les groupes vides
 ;;     sont retires par fetch-venir.sh : jamais de titre orphelin ici.
+;;     Le triangle est un label a part : c'est LUI seul qui prend la couleur
+;;     du groupe (rouge pour "retard"), le texte reste blanc (retour
+;;     utilisateur 11/09). Une seule ligne de 18px : hauteur inchangee pour
+;;     mise-en-page.py.
 (defwidget venir_groupe [g]
   (box :class "section" :orientation "v" :space-evenly false
-    (label :class "sect-label venir-${g.cle}" :halign "start" :text "► ${g.entete}")
+    (box :orientation "h" :space-evenly false :halign "start"
+      (label :class "sect-label sect-puce venir-${g.cle}" :text "►")
+      ;; pas d'espace en tete : eww le supprime ; l'ecart est la marge de
+      ;; .sect-puce (eww.scss)
+      (label :class "sect-label" :text "${g.entete}"))
     (for it in {g.items}
       (venir_item :it it :cle {g.cle}))))
 
