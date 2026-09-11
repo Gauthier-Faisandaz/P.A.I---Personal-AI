@@ -17,7 +17,7 @@ LOG="$HOME/.cache/eww-start.log"
 
 # Reglages (valeurs de repli si le fichier manque)
 MARGE=20
-MARGE_DROITE=48
+MARGE_DROITE=42
 # shellcheck source=geometrie.conf
 [ -r "$CFG/geometrie.conf" ] && . "$CFG/geometrie.conf"
 
@@ -29,9 +29,10 @@ TARGET="$(cat "$CACHE/target_screen" 2>/dev/null)"
 # ..." -> 1080), moins la marge en haut et en bas : voir le commentaire de
 # "defwindow colonne" dans eww.yuck. Repli si l'ecran n'a pas pu etre lu
 # (TARGET=0) : 93% de la hauteur, comme avant la refonte.
-H_ECRAN="$(xrandr --query | grep "^$TARGET connected" \
-           | grep -oE '[0-9]+x[0-9]+\+[0-9]+\+[0-9]+' | head -n1 \
-           | cut -dx -f2 | cut -d+ -f1)"
+RES="$(xrandr --query | grep "^$TARGET connected" \
+       | grep -oE '[0-9]+x[0-9]+\+[0-9]+\+[0-9]+' | head -n1 | cut -d+ -f1)"
+W_ECRAN="${RES%x*}"      # "1920x1080" -> 1920
+H_ECRAN="${RES#*x}"      # "1920x1080" -> 1080
 if [[ "$H_ECRAN" =~ ^[0-9]+$ ]]; then
   HAUTEUR="$((H_ECRAN - 2 * MARGE))px"
 else
@@ -46,6 +47,22 @@ ARGS=(--arg "marge=${MARGE}px" --arg "hauteur=$HAUTEUR" --arg "droite=-${MARGE_D
 # Memorise la geometrie : mise-en-page.py y lit la marge et la hauteur.
 printf '%s ' "${ARGS[@]}" > "$CACHE/colonne_args"
 echo "$(date '+%F %T') - colonne sur $TARGET : marge ${MARGE}px, droite ${MARGE_DROITE}px, hauteur $HAUTEUR" >> "$LOG"
+
+# Geometrie en px pour ui.sh, qui place la modale a gauche de la colonne.
+# COLONNE_L = 33% de la largeur de l'ecran, arrondi vers le bas comme eww
+# (1920 -> 633, 1366 -> 450, verifie avec xwininfo) ; 33 = :width de la
+# colonne dans eww.yuck.
+{
+  echo "ECRAN_H=$H_ECRAN"
+  echo "MARGE=$MARGE"
+  echo "MARGE_DROITE=$MARGE_DROITE"
+  [[ "$W_ECRAN" =~ ^[0-9]+$ ]] && echo "COLONNE_L=$((W_ECRAN * 33 / 100))"
+} > "$CACHE/geometrie.env"
+
+# La modale est placee par rapport a la colonne : si la colonne bouge
+# (marge.sh, changement d'ecran), une modale ouverte serait mal placee.
+"$EWW" close modale 2>/dev/null
+"$EWW" update mail_modale="" 2>/dev/null
 
 # Fermer d'abord (sans erreur si deja fermee) : le script est relancable.
 "$EWW" close colonne 2>/dev/null

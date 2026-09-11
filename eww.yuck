@@ -16,8 +16,10 @@
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
 ;;   - variables digest recos venir         -> sync.sh
-;;   - variables h_* y_* (hauteurs, y)      -> mise-en-page.py
-;;   - fenetre colonne                      -> start.sh, eww-watchdog.sh
+;;   - variables h_* y_* t_*                -> mise-en-page.py
+;;   - variable mail_modale, y_mail         -> ui.sh
+;;   - fenetre colonne                      -> ouvrir-colonne.sh
+;;   - fenetre modale                       -> ui.sh, ouvrir-colonne.sh
 
 
 ;; ==========================================================================
@@ -180,16 +182,29 @@
 (defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
-;; --- Ligne de mail : pas de clic pour l'instant. Le detail in-place a ete
-;;     retire a l'etape 0 ; le clic ouvrira la modale a l'etape 5. D'ici la,
-;;     une simple box : aucun clic a capter.
+;; --- Mail affiche dans la modale : son mail_id, "" = modale fermee. Ecrit
+;;     par ui.sh (open / close). Sert aussi a marquer la ligne choisie.
+(defvar mail_modale "")
+
+;; --- Ligne de mail : clic -> modale de CE mail, et rien d'autre (les
+;;     actions sont les boutons de la modale). La ligne reste marquee
+;;     (classe selected) tant que sa modale est ouverte.
+;; :timeout "5s" : ui.sh enchaine plusieurs appels eww, et eww TUE une
+;; commande onclick au-dela de son timeout (200ms par defaut, voir le
+;; bouton ↻ du widget panel).
+;; Deux classes, deux widgets : l'eventbox porte "item" (fond au survol,
+;; selection) mais IGNORE le padding CSS (GTK3, mesure le 11/09 : lignes
+;; de 33px au lieu de 37) ; le padding va donc sur la box interieure
+;; ("item-corps"), sinon mise-en-page.py compterait 4px de trop par mail.
 (defwidget mail_item [it]
-  (box :class "item" :orientation "v" :space-evenly false :hexpand true
-    (label :class "item-subject ${it.read ? '' : 'nonlu'}"
-           :halign "start" :hexpand true :wrap false :truncate true
-           :text "  ${it.urgent ? '⚠ ' : ''}${it.read ? '' : '● '}${it.subject_short}")
-    (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
-           :text "      ${it.meta}")))
+  (eventbox :class "item ${it.mail_id == mail_modale ? 'selected' : ''}" :timeout "5s"
+            :onclick "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
+    (box :class "item-corps" :orientation "v" :space-evenly false :hexpand true
+      (label :class "item-subject ${it.read ? '' : 'nonlu'}"
+             :halign "start" :hexpand true :wrap false :truncate true
+             :text "  ${it.urgent ? '⚠ ' : ''}${it.read ? '' : '● '}${it.subject_short}")
+      (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
+             :text "      ${it.meta}"))))
 
 (defwidget section [label items]
   (box :class "section" :orientation "v" :space-evenly false
@@ -206,6 +221,56 @@
     (box :orientation "v" :space-evenly false
       (for s in {digest.sections ?: []}
         (section :label {s.label} :items {s.items})))))
+
+
+;; ==========================================================================
+;;  MODALE MAIL  (clic sur une ligne de mail)
+;; ==========================================================================
+;; Contenu repris tel quel de la modale d'avant l'accordeon (commit 8c5b890 :
+;; side_panel + detail_content). Un seul ajout : le corps defile (scroll),
+;; la modale ayant desormais une hauteur fixe, et les boutons restent en bas.
+
+;; --- Separateur + resume du mail (masques si le texte est vide) ---------
+(defwidget side_summary [text]
+  (box :orientation "v" :space-evenly false :visible {text != ''}
+    (box :class "side-sep")
+    (label :class "side-summary" :halign "start" :wrap true :xalign 0 :text text)))
+
+;; Le mail est passe deja resolu, avec un repli "{}" a CHAQUE niveau
+;; d'indexation : digest.by_id peut etre null avant le premier fetch, et
+;; by_id[mail_modale] l'est si l'id est absent (mail disparu au dernier
+;; rafraichissement). Indexer un champ sur null plante le rendu du widget
+;; entier (constate le 12/08). :visible = securite en plus : contenu nul
+;; tant qu'aucun mail n'est choisi.
+(defwidget modale_box []
+  (box :visible {mail_modale != ''} :vexpand true
+    (modale_contenu :mail {(digest.by_id ?: {})[mail_modale] ?: {}})))
+
+(defwidget modale_contenu [mail]
+  (box :class "panel side" :orientation "v" :space-evenly false :hexpand true :vexpand true
+    ;; En-tete : sujet + croix de fermeture
+    (box :class "detail-head" :orientation "h" :space-evenly false
+      (label :class "side-title" :halign "start" :hexpand true :wrap true :xalign 0
+             :valign "start" :text {mail.subject ?: '(mail introuvable)'})
+      (button :class "close-btn" :valign "start" :timeout "5s"
+              :onclick "bash ~/.config/eww/ui.sh close" "✕"))
+    ;; Corps : defile si le mail est long
+    (scroll :vscroll true :hscroll false :vexpand true
+      (box :orientation "v" :space-evenly false
+        (label :class "side-from" :halign "start" :wrap true :xalign 0
+               :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
+        (label :class "side-badges" :halign "start"
+               :text "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}")
+        (label :class "side-reason" :halign "start" :wrap true :xalign 0
+               :text {mail.reason ?: ''})
+        (side_summary :text {mail.summary ?: ''})))
+    ;; Actions, toujours visibles en bas. 3 derniers = placeholders a
+    ;; cabler plus tard (etape 6).
+    (box :class "detail-actions" :orientation "h" :space-evenly true
+      (button :class "action-btn" :onclick "xdg-open '${mail.url ?: ''}'" "Ouvrir email")
+      (button :class "action-btn" "Action 2")
+      (button :class "action-btn" "Action 3")
+      (button :class "action-btn" "Action 4"))))
 
 
 ;; ==========================================================================
@@ -293,3 +358,21 @@
     ;; trois panneaux (mise-en-page.py) remplissent exactement le reste :
     ;; le bandeau garde sa hauteur naturelle et reste colle en bas.
     (bandeau)))
+
+;; --- Modale mail : fenetre SEPAREE, meme couche que la colonne (bg/dock :
+;; les clics y fonctionnent, seul le focus clavier manque -- inutile ici).
+;; Ouverte/fermee REELLEMENT par ui.sh, jamais mappee en permanence : une
+;; fenetre transparente laissee mappee laisse un fond fantome sous picom
+;; (constate le 12/08). Geometrie : ARGUMENTS calcules par ui.sh au clic
+;; (eww refuse une variable dans :geometry) :
+;;   x       = -(marge droite + largeur colonne + 14) : juste a gauche
+;;   y       = haut du panneau mails (y_mail) AU MOMENT DU CLIC, recale vers
+;;             le haut si la modale depasserait le bas de l'ecran
+;;   hauteur = 420px, propre a la modale
+;; Un argument est fige a l'ouverture : si les panneaux changent de hauteur
+;; pendant que la modale est ouverte, elle ne bouge pas.
+(defwindow modale [x y hauteur]
+  :monitor 0
+  :geometry (geometry :x x :y y :width "30%" :height hauteur :anchor "top right")
+  :stacking "bg" :windowtype "dock" :wm-ignore false
+  (modale_box))

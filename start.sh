@@ -137,7 +137,6 @@ printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
 # ecrit juste au-dessus.
 bash "$HOME/.config/eww/ouvrir-colonne.sh"
 
-# (Jusqu'a la refonte en colonne, des fenetres de detail etaient ouvertes a
-# la demande par ui.sh, supprime a l'etape 0 de la colonne elastique :
-# "colonne" est pour l'instant la seule fenetre. target_screen, enregistre
-# ci-dessus, reste utilise par eww-watchdog.sh pour la rouvrir.)
+# (La 2e fenetre, "modale" -- le detail d'un mail --, n'est PAS ouverte
+# ici : ui.sh l'ouvre au clic sur un mail et la ferme a la croix, avec de
+# vrais open/close. Voir ui.sh pour la raison : fond fantome sous picom.)
