@@ -216,14 +216,15 @@
 
 ;; --- Groupe : titre ("► EN RETARD · 1"), puis ses lignes. Les groupes vides
 ;;     sont retires par fetch-venir.sh : jamais de titre orphelin ici.
-;;     Tout en blanc : le groupe en retard se distingue par ⚠ a la place
-;;     de ►, le meme signe que les mails urgents de la boite de reception
-;;     (un seul code visuel pour "attention"). Rouge essaye puis ecarte
-;;     (retour utilisateur 11/09).
+;;     Tout en blanc : le groupe en retard se distingue par un "!" (gras,
+;;     comme tout le titre) a la place de ►. Essayes puis ecartes (retours
+;;     utilisateur 11/09) : le rouge, puis ⚠ -- glyphe d'une police de
+;;     secours, trop fin, il se voyait mal. "!" est un caractere de DejaVu
+;;     Sans Mono : meme epaisseur que le texte, meme largeur que ►.
 (defwidget venir_groupe [g]
   (box :class "section" :orientation "v" :space-evenly false
     (label :class "sect-label venir-${g.cle}" :halign "start"
-           :text "${g.cle == 'retard' ? '⚠' : '►'} ${g.entete}")
+           :text "${g.cle == 'retard' ? '!' : '►'} ${g.entete}")
     (for it in {g.items}
       (venir_item :it it :cle {g.cle}))))
 
