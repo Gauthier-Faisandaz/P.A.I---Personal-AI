@@ -257,15 +257,16 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
    .coupe-halo (liste tronquee) : un halo blanc BOMBE dans cette marge,
    sous la liste, sans jamais couvrir de texte (retour utilisateur 11/09 :
    l'ancien degrade rectangulaire, pose par-dessus les dernieres lignes,
-   etait moche). Demi-ellipse centree sur le bord haut de la zone (juste
-   sous la derniere ligne visible), aussi large que la liste et aussi haute
-   que la zone : une forme en dome, plus lumineuse au centre. Plusieurs
+   etait moche). Demi-ellipse centree sur le bord BAS de la zone (contre
+   la bordure du panneau), aussi large que la liste et aussi haute que la
+   zone : un dome qui monte vers la liste, plus lumineux au centre (sens
+   choisi par l'utilisateur 11/09, l'inverse pendait sous la liste). Plusieurs
    paliers de transparence donnent un fondu doux jusqu'aux bords, sans
    limite nette. Blanc, comme le voile des panneaux (retour utilisateur
    11/09 : le noir tranchait avec le verre). */
 .coupe-zone { min-height: $panneau-pad-v; }
 .coupe-halo {
-  background-image: radial-gradient(ellipse farthest-side at 50% 0%,
+  background-image: radial-gradient(ellipse farthest-side at 50% 100%,
                                     rgba(255, 255, 255, 0.45) 0%,
                                     rgba(255, 255, 255, 0.30) 25%,
                                     rgba(255, 255, 255, 0.15) 50%,
