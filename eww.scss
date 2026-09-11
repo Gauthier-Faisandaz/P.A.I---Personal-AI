@@ -163,13 +163,18 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 /* Degrade pose par-dessus le bas de la liste (widget overlay, eww.yuck) :
    le texte s'estompe au lieu d'etre coupe net. Hauteur : :height 20 dans
    eww.yuck (pose par-dessus : ne compte pas dans la mise en page). */
+/* Blanc (retour utilisateur 11/09 : le noir tranchait avec le verre) : le
+   bas de la liste se fond dans un voile blanc, comme le fond des panneaux. */
 .coupe-degrade {
   background-image: linear-gradient(to bottom,
-                                    rgba(20, 20, 20, 0),
-                                    rgba(20, 20, 20, 0.55));
+                                    rgba(255, 255, 255, 0),
+                                    rgba(255, 255, 255, 0.35));
 }
-/* chevron colle au compteur de l'en-tete */
-.coupe { font-size: 13px; color: #8ecae6; margin-left: 6px; }
+/* chevron colle au compteur de l'en-tete. Blanc plein et triangle entier :
+   en bleu clair 13px (premiere version), il disparaissait sur le fond
+   d'ecran vert, derriere le verre (retour utilisateur 11/09). Le compteur
+   voisin est a 75% de blanc : le chevron ressort sans detonner. */
+.coupe { font-size: 13px; color: white; margin-left: 8px; }
 
 /* --- Bandeau (bas de la colonne) --------------------------------------- */
 /* Meme verre que les panneaux, mais une seule ligne de ~38px et une
