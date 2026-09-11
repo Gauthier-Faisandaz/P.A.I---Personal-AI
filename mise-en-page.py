@@ -32,8 +32,8 @@ Usage :
                            clic sur l'en-tete du panneau (eww.yuck).
                            L'etat est garde dans ~/.cache/pai/replies.json :
                            il survit aux redemarrages d'eww et du PC.
-                           Replier la boite de reception ferme la modale
-                           mail si elle est ouverte.
+                           Replier ou deplier un panneau, quel qu'il soit,
+                           ferme la modale si elle est ouverte.
   mise-en-page.py test     verifie l'algorithme sur le tableau de reference
                            du brief v9 (section 3), plus des invariants.
   mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 [--replies reco]
@@ -307,19 +307,15 @@ class Panneau:
     besoin: object    # fonction (donnees, constantes, largeur) -> px
     decor_fin: int    # decoration sans texte sous le dernier element : on
                       # peut la rogner sans que le panneau soit "tronque"
-    modale: bool = False   # ses lignes ouvrent la modale (ui.sh) : le
-                           # replier la ferme (voir fermer_modale)
 
 
 PANNEAUX = (
     Panneau("reco", "Recommandations", "recos", besoin_recos,
             8 + BORDURE),     # $reco-pad-bas + trait
     Panneau("venir", "À venir", "venir", besoin_venir, LIGNE_PAD),
-    Panneau("mail", "Boîte de réception", "digest", besoin_mails, LIGNE_PAD,
-            modale=True),
+    Panneau("mail", "Boîte de réception", "digest", besoin_mails, LIGNE_PAD),
 )
 VARS = tuple(p.var for p in PANNEAUX)
-PAR_NOM = {p.var: p for p in PANNEAUX}
 
 
 def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset()):
@@ -465,12 +461,14 @@ def pousser(res):
 
 
 def fermer_modale():
-    """Ferme la modale mail si elle est ouverte (etape 4 du repli).
+    """Ferme la modale si elle est ouverte. Appelee a CHAQUE repli ou
+    depli, quel que soit le panneau.
 
     Pourquoi la fermer : la modale fige son y a l'ouverture (ui.sh, bord
-    haut aligne sur le panneau mails). Si ce panneau se replie, elle
-    resterait accrochee dans le vide, a cote d'un simple en-tete. La fermer
-    est plus simple et plus sur que la deplacer.
+    haut aligne sur son panneau). Un repli ou un depli deplace les
+    panneaux : elle se retrouverait decalee, voire accrochee a cote d'un
+    simple en-tete si c'est son panneau qui se replie. La fermer est plus
+    simple et plus sur que la deplacer.
 
     On passe par "ui.sh close", le seul endroit qui sait la fermer
     proprement : la fenetre ET la variable mail_modale (qui marque la ligne
@@ -488,7 +486,7 @@ def fermer_modale():
         if re.search(r"^modale:", fenetres, re.M) or choisi:
             subprocess.run(["bash", UI, "close"], timeout=2, check=False, env=ENV_EWW,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("modale fermée (panneau d'origine replié)")    # -> mise-en-page.log
+            print("modale fermée (un panneau a changé d'état)")  # -> mise-en-page.log
     except subprocess.TimeoutExpired:
         print("eww ne répond pas : modale non fermée", file=sys.stderr)
 
@@ -511,11 +509,11 @@ def mettre_a_jour(basculer=None):
             # Ecrit AVANT de pousser : si eww ne repond pas, l'etat est quand
             # meme garde, et le prochain calcul l'appliquera.
             ecrire_replies(replies)
-            # On vient de REPLIER le panneau d'ou vient la modale : la fermer
-            # AVANT de changer les hauteurs, pour qu'elle ne reste pas un
-            # instant a cote d'un panneau qui n'a plus de liste.
-            if basculer in replies and PAR_NOM[basculer].modale:
-                fermer_modale()
+            # N'importe quel repli ou depli deplace des panneaux, et la
+            # modale (y fige a l'ouverture) ne serait plus alignee sur le
+            # sien : on la ferme, AVANT de changer les hauteurs (choix
+            # utilisateur 11/09).
+            fermer_modale()
         h_col, largeur, marge, _ = geometrie()
         res = calculer(lire_tout_le_bus(), REELLES, h_col, largeur, marge, replies)
         pousser(res)
