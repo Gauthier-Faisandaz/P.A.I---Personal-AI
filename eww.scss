@@ -50,8 +50,8 @@ $bandeau-haut:        38px;  /* + 2 x $bordure                          */
 /* Panneau replie : voile plus leger. Le texte reste dans le meme blanc
    qu'un panneau ouvert (choix utilisateur 11/09 : pas de gris-vert). */
 $fond-replie:         rgba(255, 255, 255, 0.05);
-/* Survol dans un en-tete : le chevron (zone cliquable) et le bouton de
-   synchro passent au jaune dore (choix utilisateur 11/09). */
+/* Survol dans un en-tete : le chevron et le titre (zone cliquable), et le
+   bouton de synchro, passent au jaune dore (choix utilisateur 11/09). */
 $accent-entete:       #f5c542;
 
 
@@ -83,7 +83,11 @@ window { background-color: transparent; }
    droite = replie). Au survol de la zone cliquable de l'en-tete, il passe
    au jaune dore : c'est le signe que l'en-tete se clique. */
 .chevron { margin-right: 8px; color: rgba(255, 255, 255, 0.75); }
-.entete-clic:hover .chevron { color: $accent-entete; }
+/* le titre se dore avec le chevron (choix utilisateur 11/09) : meme
+   selecteur, les deux changent ensemble. Le compteur a droite, lui, ne
+   change pas. */
+.entete-clic:hover .chevron,
+.entete-clic:hover .title { color: $accent-entete; }
 
 /* resume a droite de l'en-tete ("8 a traiter"...) */
 .resume { font-size: 13px; color: rgba(255, 255, 255, 0.75); margin-left: 12px; }
