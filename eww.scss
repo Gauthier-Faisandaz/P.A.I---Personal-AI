@@ -85,6 +85,10 @@ scrollbar slider { min-width: 4px; background-color: rgba(255, 255, 255, 0.30); 
 scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 
 .section    { margin-bottom: $section-marge; }
+/* Pas de marge sous le DERNIER groupe (ni sous la derniere reco, plus bas) :
+   ce vide en fin de liste faisait croire le panneau tronque de 12px, et
+   defiler pour rien. mise-en-page.py le decompte de la meme facon. */
+.section:last-child { margin-bottom: 0; }
 .sect-label { font-weight: bold; }
 .sect-item  { color: white; }
 
@@ -121,6 +125,7 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   padding-bottom: $reco-pad-bas;
   border-bottom: $bordure solid rgba(255, 255, 255, 0.18);
 }
+.reco-card:last-child { margin-bottom: 0; }
 .reco-head  { margin-bottom: $reco-tete-marge; }
 .reco-title { font-weight: bold; }
 
@@ -152,6 +157,19 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 .venir-quand.retard     { color: #ff6b6b; }
 .sect-label.venir-retard { color: #ff6b6b; }
 .venir-vide { color: rgba(255, 255, 255, 0.6); font-style: italic; }
+.mail-vide  { color: rgba(255, 255, 255, 0.6); font-style: italic; }
+
+/* --- Panneau tronque : sa liste continue sous le bord ------------------- */
+/* Degrade pose par-dessus le bas de la liste (widget overlay, eww.yuck) :
+   le texte s'estompe au lieu d'etre coupe net. Hauteur : :height 20 dans
+   eww.yuck (pose par-dessus : ne compte pas dans la mise en page). */
+.coupe-degrade {
+  background-image: linear-gradient(to bottom,
+                                    rgba(20, 20, 20, 0),
+                                    rgba(20, 20, 20, 0.55));
+}
+/* chevron colle au compteur de l'en-tete */
+.coupe { font-size: 13px; color: #8ecae6; margin-left: 6px; }
 
 /* --- Bandeau (bas de la colonne) --------------------------------------- */
 /* Meme verre que les panneaux, mais une seule ligne de ~38px et une

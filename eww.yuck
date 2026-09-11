@@ -29,12 +29,17 @@
 ;; chaque arrivee de donnees (voir publier.sh). Les y_* ne servent pas
 ;; encore : la modale mail (etape 5) s'alignera sur y_mail.
 ;; 0 = pas encore calcule (voir le widget panel ci-dessous).
+;; t_* = panneau tronque : le script n'a pas pu lui donner toute la hauteur
+;; qu'il demandait, sa liste continue sous le bord (degrade + chevron).
 (defvar h_reco 0)
 (defvar h_venir 0)
 (defvar h_mail 0)
 (defvar y_reco 0)
 (defvar y_venir 0)
 (defvar y_mail 0)
+(defvar t_reco false)
+(defvar t_venir false)
+(defvar t_mail false)
 
 ;; --- Panneau principal : en-tete (titre, resume, bouton ↻), puis le corps
 ;;     (separateur + zone de defilement) ---------------------------------
@@ -55,13 +60,18 @@
 ;; que les hauteurs valent 0 (avant le premier calcul), GTK partage la
 ;; place en tiers, comme a l'etape 0, au lieu de tout tasser en haut.
 ;; Le corps est un scroll : ce qui ne tient pas dans la hauteur defile.
-(defwidget panel [title sync source resume hauteur]
+;; tronque = t_reco... : affiche le chevron et le degrade de coupe.
+(defwidget panel [title sync source resume hauteur tronque]
   (box :class "panel" :orientation "v" :space-evenly false :vexpand true
        :height hauteur
     ;; En-tete : plus cliquable (plus d'accordeon), c'est une simple box.
     (box :class "header" :orientation "h" :space-evenly false
       (label :class "title" :halign "start" :hexpand true :text title)
       (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
+      ;; Chevron de coupe, colle au compteur : "il y en a plus que ce qui
+      ;; se voit". Le degrade en bas du corps dit OU ca continue.
+      (label :class "coupe" :visible tronque :text "▾"
+             :tooltip "la liste continue : faire défiler")
       ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
       ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
       ;; de la colonne (c'est pour ca que l'accordeon ne la montrait que sur
@@ -74,12 +84,21 @@
       (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
               :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
     (box :class "sep")
-    ;; Le scroll (vertical seulement) absorbe le contenu qui depasse la
-    ;; hauteur disponible ; les labels non wrappes ont :truncate true pour
+    ;; overlay : le 1er enfant (le scroll) donne la taille, les suivants
+    ;; sont poses PAR-DESSUS. Le scroll (vertical seulement) absorbe le
+    ;; contenu qui depasse ; les labels non wrappes ont :truncate true pour
     ;; ne pas elargir la fenetre.
-    (scroll :class "sections" :vscroll true :hscroll false :vexpand true
-      (box :orientation "v" :space-evenly false
-        (children)))))
+    (overlay :vexpand true
+      (scroll :class "sections" :vscroll true :hscroll false :vexpand true
+        (box :orientation "v" :space-evenly false
+          (children)))
+      ;; Degrade de coupe, cale en bas (:valign "end"). C'est un simple box :
+      ;; sans fenetre GDK a lui, il laisse passer la molette jusqu'au scroll
+      ;; en dessous. Limite : eww ne connait pas la position de defilement,
+      ;; le degrade reste donc visible meme une fois arrive en bas.
+      ;; 20px : environ une ligne. Plus haut, il griserait toute la zone
+      ;; visible d'un panneau reduit a son plancher (une seule ligne).
+      (box :class "coupe-degrade" :valign "end" :height 20 :visible tronque))))
 
 
 ;; ==========================================================================
@@ -100,7 +119,7 @@
 
 (defwidget recos_box []
   (panel :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
-         :resume {recos.resume ?: ''} :hauteur h_reco
+         :resume {recos.resume ?: ''} :hauteur h_reco :tronque t_reco
     (label :class "reco-empty" :halign "start" :wrap true
            :visible {arraylength(recos.recommandations ?: []) == 0}
            :text "Aucune recommandation pour le moment.")
@@ -141,7 +160,7 @@
 
 (defwidget venir_box []
   (panel :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
-         :resume {venir.resume ?: ''} :hauteur h_venir
+         :resume {venir.resume ?: ''} :hauteur h_venir :tronque t_venir
     (label :class "venir-vide" :halign "start" :wrap true
            :visible {arraylength(venir.groupes ?: []) == 0}
            :text "Rien à venir.")
@@ -180,7 +199,10 @@
 
 (defwidget digest_box []
   (panel :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
-         :resume {digest.resume ?: ''} :hauteur h_mail
+         :resume {digest.resume ?: ''} :hauteur h_mail :tronque t_mail
+    (label :class "mail-vide" :halign "start" :wrap true
+           :visible {arraylength(digest.sections ?: []) == 0}
+           :text "Aucun mail.")
     (box :orientation "v" :space-evenly false
       (for s in {digest.sections ?: []}
         (section :label {s.label} :items {s.items})))))

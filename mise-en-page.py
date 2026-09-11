@@ -13,8 +13,9 @@ Usage :
                            ~/.cache/eww/bus/*.json) et affiche le resultat,
                            sans rien envoyer a eww.
   mise-en-page.py --pousser
-                           meme calcul, puis envoie les six variables a eww
-                           (h_reco h_venir h_mail y_reco y_venir y_mail).
+                           meme calcul, puis envoie a eww les hauteurs
+                           (h_reco h_venir h_mail), les positions (y_*) et
+                           les indicateurs de coupe (t_* : true/false).
                            Lance par publier.sh apres chaque fetch-*.sh.
   mise-en-page.py test     verifie l'algorithme sur le tableau de reference
                            du brief (section 3), plus des invariants.
@@ -64,12 +65,17 @@ SEPARATEUR = 6 + 1 + 12               # $sep-haut + trait + $sep-bas
 # Tout ce qu'un panneau occupe en dehors de son contenu :
 HABILLAGE = 2 * BORDURE + 2 * PANNEAU_PAD_V + ENTETE + SEPARATEUR   # 82
 
-SECTION_MARGE = 12     # $section-marge, sous chaque groupe
+SECTION_MARGE = 12     # $section-marge, sous chaque groupe SAUF le dernier
 LIGNE_PAD = 2          # $ligne-pad, en haut ET en bas d'une ligne
 RECO_TETE_MARGE = 2    # $reco-tete-marge
-RECO_BAS = 8 + BORDURE + 12           # $reco-pad-bas + bordure + $reco-marge
+RECO_MARGE = 12        # $reco-marge, sous chaque reco SAUF la derniere
+RECO_BAS = 8 + BORDURE + RECO_MARGE   # $reco-pad-bas + bordure + $reco-marge
 RECO_PUCE = CHASSE_12 + 8             # le "●" + $reco-puce-marge
 RECO_RETRAIT = 18      # $reco-detail-retrait
+
+# Decoration sans texte sous le dernier element de chaque panneau (reco,
+# a venir, mails) : on peut la rogner sans que le panneau soit "tronque".
+DECOR_FIN = (8 + BORDURE, LIGNE_PAD, LIGNE_PAD)   # $reco-pad-bas + trait ; $ligne-pad
 
 BANDEAU = 38 + 2 * BORDURE            # $bandeau-haut + bordures
 ECART = 16             # :spacing de la box "colonne" (eww.yuck)
@@ -91,6 +97,8 @@ class Constantes:
     reco_base: int           # reco avec un titre d'UNE ligne, sans detail
     reco_ligne_titre: int    # chaque ligne de titre en plus
     reco_ligne_detail: int   # chaque ligne de detail
+    reco_marge: int          # marge comprise dans reco_base, absente sous
+                             # la derniere reco (":last-child" dans eww.scss)
 
     @property
     def plancher(self):
@@ -111,13 +119,14 @@ REELLES = Constantes(
     reco_base=LIGNE_15 + RECO_TETE_MARGE + RECO_BAS,    # 41
     reco_ligne_titre=LIGNE_15,
     reco_ligne_detail=LIGNE_13,
+    reco_marge=RECO_MARGE,
 )
 
 # Valeurs du brief (section 4) : en-tete 34 + padding 16, ligne vide 26...
 BRIEF = Constantes(
     habillage=34 + 16, ligne_vide=26, section_titre=22, section_marge=0,
     ligne_mail=26, ligne_mail_sans_meta=26, ligne_venir=24,
-    reco_base=40, reco_ligne_titre=18, reco_ligne_detail=17,
+    reco_base=40, reco_ligne_titre=18, reco_ligne_detail=17, reco_marge=0,
 )
 
 
@@ -183,14 +192,14 @@ def besoin_recos(recos, c, largeur):
         lt = nb_lignes(r.get("titre") or "(sans titre)", interieur - RECO_PUCE, CHASSE_15)
         ld = nb_lignes(r.get("detail") or "", interieur - RECO_RETRAIT, CHASSE_13)
         total += c.reco_base + (lt - 1) * c.reco_ligne_titre + ld * c.reco_ligne_detail
-    return total
+    return total - c.reco_marge                # pas de marge sous la derniere
 
 
 def besoin_venir(venir, c):
     groupes = venir.get("groupes") or []
     if not groupes:
         return c.habillage + c.ligne_vide
-    return c.habillage + sum(
+    return c.habillage - c.section_marge + sum(   # pas de marge sous le dernier
         c.section_titre + len(g.get("items") or []) * c.ligne_venir + c.section_marge
         for g in groupes)
 
@@ -198,15 +207,13 @@ def besoin_venir(venir, c):
 def besoin_mails(digest, c):
     sections = digest.get("sections") or []
     if not sections:
-        # (Ce panneau n'affiche pas encore de message "vide" : on compte
-        # comme les autres, de toute facon ramene au plancher.)
-        return c.habillage + c.ligne_vide
+        return c.habillage + c.ligne_vide      # "Aucun mail."
     total = c.habillage
     for s in sections:
         total += c.section_titre + c.section_marge
         for it in s.get("items") or []:
             total += c.ligne_mail if it.get("meta") else c.ligne_mail_sans_meta
-    return total
+    return total - c.section_marge             # pas de marge sous la derniere
 
 
 def calculer(recos, venir, digest, c, hauteur_colonne, largeur, marge):
@@ -218,8 +225,11 @@ def calculer(recos, venir, digest, c, hauteur_colonne, largeur, marge):
     h = repartir(A, besoins, c.plancher)
     # y[i] = marge + somme des (h[j] + ecart) pour j < i
     y = [marge, marge + h[0] + ECART, marge + h[0] + h[1] + 2 * ECART]
+    # Tronque = du TEXTE est cache. Rogner seulement la decoration sous le
+    # dernier element (padding + trait d'une reco, padding d'une ligne)
+    # ne cache rien de lisible : pas de chevron ni de degrade pour ca.
     return {"A": A, "besoin": besoins, "h": h, "y": y,
-            "tronque": [hi < bi for hi, bi in zip(h, besoins)]}
+            "tronque": [bi - hi > tol for hi, bi, tol in zip(h, besoins, DECOR_FIN)]}
 
 
 # ==========================================================================
@@ -282,15 +292,16 @@ VARS = ("reco", "venir", "mail")
 
 
 def affectations(res):
-    """["h_reco=128", ..., "y_mail=518"] : les six variables pour eww."""
+    """["h_reco=128", ..., "t_mail=false"] : les neuf variables pour eww."""
     return ([f"h_{v}={x}" for v, x in zip(VARS, res["h"])] +
-            [f"y_{v}={x}" for v, x in zip(VARS, res["y"])])
+            [f"y_{v}={x}" for v, x in zip(VARS, res["y"])] +
+            [f"t_{v}={'true' if t else 'false'}" for v, t in zip(VARS, res["tronque"])])
 
 
 def pousser(res):
-    """UN seul "eww update" pour les six variables : les trois panneaux
-    changent de taille dans le meme rendu, sans etat intermediaire ou la
-    colonne serait trop haute ou trop courte."""
+    """UN seul "eww update" pour toutes les variables : les trois panneaux
+    changent de taille (et de signal de coupe) dans le meme rendu, sans
+    etat intermediaire ou la colonne serait trop haute ou trop courte."""
     subprocess.run([EWW, "update", *affectations(res)], timeout=5, check=False)
 
 

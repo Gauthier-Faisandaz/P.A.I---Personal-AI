@@ -3,7 +3,14 @@
 # 2 sections : À TRAITER (inclut category=urgent, flag urgent) et EN ATTENTE.
 # read/unread via status ; lien Gmail via mail_id ; index by_id pour survol/clic.
 URL="https://n8n.power-of-automation.link/webhook/c9d179c1-870f-4973-ae04-29f4d2c22766"
-OUT="$(curl -s --netrc --max-time 8 "$URL")"
+# DIGEST_EXEMPLE permet de tester avec un faux fichier au lieu de n8n :
+#   DIGEST_EXEMPLE=~/.config/eww/exemples/mails-test.json bash ~/.config/eww/sync.sh digest
+# (le prochain rafraichissement automatique, <= 5 min, remet les vrais mails)
+if [ -n "$DIGEST_EXEMPLE" ]; then
+  OUT="$(cat "$DIGEST_EXEMPLE" 2>/dev/null)"
+else
+  OUT="$(curl -s --netrc --max-time 8 "$URL")"
+fi
 [ -z "$OUT" ] && OUT='{}'
 printf '%s' "$OUT" | python3 -c '
 import sys, json, datetime
