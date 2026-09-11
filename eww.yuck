@@ -346,15 +346,17 @@
     (label :class "side-summary" :halign "start" :wrap true :xalign 0 :text text)))
 
 ;; --- Bouton d'action de la modale --------------------------------------
-;; commande = ligne shell lancee au clic ; "" = emplacement LIBRE : bouton
-;; inerte (:active false), en pointilles, avec une infobulle.
+;; commande = ligne shell lancee au clic ; "" = bouton inerte (:active
+;; false), en pointilles. L'infobulle "emplacement libre" n'apparait que sur
+;; les vrais emplacements "à définir" : un "Ouvrir la source" inerte (item
+;; sans lien) n'est pas un emplacement a definir.
 ;; setsid -f : la commande est detachee d'eww. Sinon eww la TUE a la fin de
 ;; son :timeout (200ms par defaut, voir le bouton ↻) -- et un navigateur
 ;; que xdg-open venait de lancer pouvait etre tue avec elle.
 (defwidget action [libelle commande]
   (button :class "action-btn ${commande == '' ? 'a-definir' : ''}"
           :active {commande != ''}
-          :tooltip {commande == '' ? 'Emplacement libre : action à définir (eww.yuck, modale_mail / modale_veille)' : ''}
+          :tooltip {libelle == 'à définir' ? 'Emplacement libre : action à définir (eww.yuck, modale_mail / modale_veille)' : ''}
           :onclick "setsid -f ${commande} >/dev/null 2>&1"
           libelle))
 
@@ -423,7 +425,12 @@
 
 ;; --- Contenu VEILLE : le titre de l'article, "source · age", puis la
 ;; phrase de curation ("pourquoi c'est pour toi"), qui ne s'affiche QUE ici.
-;; TODO etape 6 : bouton 1 = "Ouvrir la source" (xdg-open sur it.url).
+;; Bouton 1 : ouvre l'article dans le navigateur (xdg-open, comme le mail).
+;; L'url passe entre apostrophes dans une commande shell : c'est sans
+;; danger parce que fetch-veille.sh ne laisse passer que des liens
+;; http(s), sans espace, apostrophe codee %27 (voir url_sure). Item sans
+;; url (absente ou refusee) : commande vide -> bouton inerte, rien n'est
+;; lance.
 ;; TODO : emplacements 2 a 4, en attente de Gauthier. Ne rien inventer.
 (defwidget modale_veille [it]
   (modale_contenu
@@ -432,7 +439,8 @@
     :ligne2 ""
     :texte {it.pourquoi ?: ''}
     :resume ""
-    :l1 "à définir" :c1 ""
+    :l1 "Ouvrir la source"
+    :c1 {(it.url ?: '') != '' ? "xdg-open '${it.url}'" : ''}
     :l2 "à définir" :c2 ""
     :l3 "à définir" :c3 ""
     :l4 "à définir" :c4 ""))
