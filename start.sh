@@ -10,6 +10,10 @@
 #   "external" = l'ecran fixe (celui de droite)
 #   "laptop"   = l'ecran du portable
 DUAL_TARGET="external"
+
+# Ecart (en px) entre le bord de l'ecran et la colonne, IDENTIQUE en haut
+# (au-dessus du 1er panneau) et en bas (sous le bandeau).
+MARGE=20
 # ================================================================
 
 EWW="$HOME/.cargo/bin/eww"
@@ -127,13 +131,34 @@ echo "$(date '+%F %T') - ecran cible : $TARGET" >> "$LOG"
 # Memorise l'ecran cible (utilise plus bas dans ce script)
 printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
 
+# --- Hauteur de la colonne ------------------------------------------------
+# Hauteur de l'ecran cible, lue dans sa ligne xrandr ("... 1920x1080+1366+0
+# ..." -> 1080), moins la marge en haut et en bas : voir le commentaire de
+# "defwindow colonne" dans eww.yuck pour la raison de ce calcul.
+# Repli si l'ecran n'a pas pu etre lu (TARGET=0) : 93% de la hauteur, comme
+# avant.
+H_ECRAN="$(printf '%s\n' "$CONNECTED" | grep "^$TARGET " \
+           | grep -oE '[0-9]+x[0-9]+\+[0-9]+\+[0-9]+' | head -n1 \
+           | cut -dx -f2 | cut -d+ -f1)"
+if [[ "$H_ECRAN" =~ ^[0-9]+$ ]]; then
+  HAUTEUR="$((H_ECRAN - 2 * MARGE))px"
+else
+  HAUTEUR="93%"
+fi
+echo "$(date '+%F %T') - colonne : marge ${MARGE}px, hauteur $HAUTEUR" >> "$LOG"
+
+# Memorise les arguments d'ouverture : eww-watchdog.sh doit rouvrir la
+# colonne a l'identique apres un redemarrage du demon.
+printf -- '--arg marge=%spx --arg hauteur=%s' "$MARGE" "$HAUTEUR" \
+  > "$HOME/.cache/eww/colonne_args"
+
 # --- Ouverture de la colonne sur le bon ecran -----------------------------
 # Depuis la refonte (09/2026), tout le dashboard tient dans UNE seule
 # fenetre, "colonne" (voir eww.yuck). On ferme d'abord (sans erreur si deja
 # ferme) pour que le script soit relançable.
 "$EWW" close colonne 2>/dev/null
 
-"$EWW" open  colonne --screen "$TARGET"
+"$EWW" open  colonne --screen "$TARGET" --arg "marge=${MARGE}px" --arg "hauteur=$HAUTEUR"
 
 # (Jusqu'a la refonte en colonne, des fenetres de detail etaient ouvertes a
 # la demande par ui.sh, supprime a l'etape 0 de la colonne elastique :

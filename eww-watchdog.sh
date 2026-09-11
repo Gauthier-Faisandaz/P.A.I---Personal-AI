@@ -39,8 +39,14 @@ full_restart() {
   RUST_LOG=debug "$EWW" daemon > "$CACHE/eww-daemon.out.log" 2>&1 &
   sleep 1.5
   TARGET="$(cat "$CACHE/target_screen" 2>/dev/null)"
+  # Arguments de la colonne (marge, hauteur) calcules par start.sh. Pas de
+  # guillemets autour de $ARGS : il contient plusieurs options a separer.
+  # Repli sur les valeurs d'avant si le fichier manque.
+  ARGS="$(cat "$CACHE/colonne_args" 2>/dev/null)"
+  [ -n "$ARGS" ] || ARGS="--arg marge=24px --arg hauteur=93%"
   "$EWW" close colonne 2>/dev/null
-  "$EWW" open colonne --screen "$TARGET" 2>/dev/null
+  # shellcheck disable=SC2086
+  "$EWW" open colonne --screen "$TARGET" $ARGS 2>/dev/null
   log "redemarrage termine"
 }
 

@@ -216,19 +216,22 @@
 ;; des autres. Ici les panneaux sont empiles dans une vbox, a l'interieur
 ;; d'une fenetre de hauteur FIXE (c'est ce qui colle le bandeau en bas).
 ;;
-;; Geometrie : eww 0.6.0 refuse de melanger les unites dans une meme valeur
-;; ("96%-24px" -> "Invalid unit", teste le 10/09). On garde donc le haut a
-;; 24px comme avant et une hauteur en % : 93% laisse >= 30px sous la
-;; colonne, sur le portable (768) comme sur l'externe (1080). Les % sont
-;; relatifs a l'ecran passe par --screen : la colonne s'adapte seule a
-;; l'ecran choisi par start.sh.
+;; Geometrie : meme marge en haut et en bas de l'ecran (symetrie). Il
+;; faudrait donc une hauteur "100% - 2 x marge", mais eww 0.6.0 refuse de
+;; melanger les unites dans une meme valeur ("96%-24px" -> "Invalid unit",
+;; teste le 10/09), et un % ne tombe juste que sur un seul ecran. D'ou deux
+;; ARGUMENTS de fenetre, calcules et passes par start.sh a l'ouverture
+;; (eww open colonne --arg marge=20px --arg hauteur=1040px) :
+;;   marge   = ecart bord de l'ecran <-> haut de la colonne (et bas du bandeau)
+;;   hauteur = hauteur de l'ecran cible (lue par xrandr) - 2 x marge
+;; Le reglage de la marge est dans start.sh (MARGE), nulle part ailleurs.
 ;;
 ;; Picom floute TOUTE la surface d'une fenetre Eww (voir picom.conf) : les
 ;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
 ;; le voile blanc ni la bordure des panneaux.
-(defwindow colonne
+(defwindow colonne [marge hauteur]
   :monitor 0
-  :geometry (geometry :x "-24px" :y "24px" :width "33%" :height "93%" :anchor "top right")
+  :geometry (geometry :x "-24px" :y marge :width "33%" :height hauteur :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   ;; Ordre : qu'est-ce que je fais maintenant -> qu'est-ce qui est engage
   ;; -> qu'est-ce qui demande une reponse.
