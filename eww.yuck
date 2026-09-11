@@ -1,18 +1,20 @@
-;; ~/.config/eww/eww.yuck - Viridis Lab : colonne accordeon (recommandations,
-;;                          a venir, boite de reception) + bandeau (verre)
+;; ~/.config/eww/eww.yuck - Viridis Lab : colonne (recommandations, a venir,
+;;                          boite de reception) + bandeau (verre)
 ;; Demarrage :  voir start.sh (ouvre toutes les fenetres sur le bon ecran)
 ;; Recharger :  eww reload
 ;;
 ;; NOTE (12/08) : le survol (apercu au hover) a ete entierement retire.
 ;; Il causait des bugs recurrents et jamais totalement resolus (fenetres qui
 ;; restent ouvertes, qui ne s'affichent pas, fond glassmorphique fantome
-;; visible en permanence...) malgre plusieurs refontes successives. Seul le
-;; clic (ouverture d'un detail complet, fermable) est conserve : il s'est
-;; montre fiable tout du long. Le survol sera rebati plus tard, proprement,
-;; sur cette base saine.
+;; visible en permanence...) malgre plusieurs refontes successives.
+;;
+;; NOTE (11/09, etape 0 de la colonne elastique) : l'accordeon (un seul
+;; panneau deplie a la fois) et le detail mail affiche a la place de la
+;; liste ont ete retires : ils forcaient a cliquer pour voir ce que le
+;; dashboard doit montrer d'un coup d'oeil. Les trois panneaux sont
+;; desormais toujours visibles. Version accordeon : branche refonte-colonne.
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
-;;   - variables ouvert / mail_ouvert       -> ui.sh
 ;;   - variables digest recos venir         -> sync.sh
 ;;   - fenetre colonne                      -> start.sh, eww-watchdog.sh
 
@@ -21,183 +23,52 @@
 ;;  WIDGETS COMMUNS
 ;; ==========================================================================
 
-;; --- Accordeon : quel panneau de la colonne est deplie ---------------------
-;; Valeurs : "reco" | "venir" | "mail". Un seul panneau deplie a la fois ;
-;; les autres se replient sur leur en-tete. Pas d'etat "tout replie" (ca
-;; laisserait un trou dans la colonne). Modifiee par ui.sh (action panneau).
-(defvar ouvert "mail")
-
-;; --- Panneau principal : en-tete cliquable (chevron, titre, heure de
-;;     synchro, bouton ↻), puis le corps (separateur + contenu) -------------
+;; --- Panneau principal : en-tete (titre, resume, bouton ↻), puis le corps
+;;     (separateur + zone de defilement) ---------------------------------
 ;; Attention : eww refuse un (for ...) passe directement en enfant d'un
 ;; widget perso ("can only be used as a child of some container widget") --
 ;; toujours l'envelopper dans un (box ...) cote appelant.
-;; id     = nom du panneau dans l'accordeon (reco | venir | mail)
 ;; source = argument passe a sync.sh (digest | recos | venir)
+;; sync   = heure de la derniere synchro, affichee en infobulle du bouton ↻
 ;; resume = texte court affiche a droite de l'en-tete ("8 à traiter"...),
 ;;          pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
-;; semi   = phrase affichee sous l'en-tete quand le panneau est REPLIE
-;;          (etat "semi-ouvert"). "" = pas de ligne : seul le panneau
-;;          recommandations en fournit une (champ "synthese" du JSON)
 ;;
-;; Deplie / replie (teste le 10/09 sur eww 0.6.0) :
-;;  - :visible false sur le corps le masque ET libere sa place (comportement
-;;    GTK normal) : pas besoin de revealer.
-;;  - :vexpand sur le panneau OUVERT seulement : c'est lui qui absorbe toute
-;;    la hauteur restante de la colonne, les replies gardent la hauteur de
-;;    leur en-tete. Il faut le mettre sur le panneau lui-meme : eww fixe
-;;    explicitement vexpand sur chaque widget, ce qui empeche GTK de le faire
-;;    remonter du scroll interieur vers le panneau.
-(defwidget panel [id title sync source resume semi]
-  (box :class "panel" :orientation "v" :space-evenly false :vexpand {ouvert == id}
-    ;; En-tete : clic -> ui.sh panneau <id> plutot qu'un simple "eww update",
-    ;; pour que le clic sur le panneau DEJA ouvert soit sans effet et que les
-    ;; popups de detail se ferment quand leur panneau se replie. :timeout
-    ;; "2s" : ui.sh enchaine plusieurs appels eww (voir le bouton ↻ ci-dessous
-    ;; pour la raison du timeout). Le clic sur ↻ n'ouvre pas le panneau : le
-    ;; bouton consomme son clic avant l'eventbox.
-    (eventbox :class "panel-head" :timeout "2s"
-              :onclick "bash ~/.config/eww/ui.sh panneau ${id}"
-      (box :class "header" :orientation "h" :space-evenly false
-        (label :class "chevron" :text {ouvert == id ? "▾" : "▸"})
-        (label :class "title" :halign "start" :hexpand true :text title)
-        ;; Resume : toujours visible. Heure de synchro + bouton ↻ : panneau
-        ;; ouvert seulement (633px ne suffisent pas pour tout afficher sur
-        ;; chaque en-tete ; un panneau replie se rafraichit quand meme tout
-        ;; seul via son defpoll).
-        (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
-        (label :class "synced" :halign "end" :visible {ouvert == id} :text "sync ${sync}")
-        ;; :timeout "15s" : eww TUE une commande onclick au bout de son
-        ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
-        ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
-        ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
-        ;; d'avoir mis a jour le panneau.
-        (button :class "sync-icon" :timeout "15s" :visible {ouvert == id}
-                :onclick "bash ~/.config/eww/sync.sh ${source}" "↻")))
-    ;; Ligne semi-ouverte : panneau replie + phrase non vide. :wrap true
-    ;; coupe entre deux mots ; :lines 2 + :truncate true bornent a DEUX
-    ;; lignes (termine par "…" si la phrase est trop longue) -- teste le
-    ;; 10/09 sur eww 0.6.0 : sans :lines, une phrase longue prend 3 lignes.
-    (label :class "synthese" :halign "start" :xalign 0
-           :wrap true :lines 2 :truncate true
-           :visible {ouvert != id && semi != ''} :text semi)
-    ;; Corps : visible uniquement sur le panneau ouvert. Le defilement n'est
-    ;; PAS fait ici mais par l'appelant, avec (defil ...) : le panneau mails
-    ;; a besoin de DEUX zones de defilement independantes (liste et detail)
-    ;; pour que la liste retrouve sa position au retour du detail.
-    (box :orientation "v" :space-evenly false :vexpand true :visible {ouvert == id}
-      (box :class "sep")
-      (children))))
-
-;; --- Zone de defilement d'un corps de panneau -----------------------------
-;; Le scroll (vertical seulement) absorbe le contenu qui depasse la hauteur
-;; disponible ; les labels non wrappes ont :truncate true pour ne pas
-;; elargir la fenetre. Meme contrainte que panel : un (for ...) doit etre
-;; enveloppe dans un (box ...) cote appelant.
-(defwidget defil []
-  (scroll :class "sections" :vscroll true :hscroll false :vexpand true
-    (box :orientation "v" :space-evenly false
-      (children))))
-
-;; --- Separateur + texte long du detail (masques si le texte est vide) ----
-(defwidget side_summary [text]
-  (box :orientation "v" :space-evenly false :visible {text != ''}
-    (box :class "side-sep")
-    (label :class "side-summary" :halign "start" :wrap true :text text)))
-
-;; --- Barre d'actions, poussee tout en bas du panneau lateral -------------
-(defwidget action_bar []
-  (box :orientation "v" :space-evenly false :vexpand true :valign "end"
-    (box :class "detail-actions" :orientation "h" :space-evenly true
-      (children))))
-
-
-;; ==========================================================================
-;;  DIGEST MAIL  (clic = detail ; auto-refresh 5 min)
-;; ==========================================================================
-;; --- Detail in-place : "" = la liste est affichee ; sinon, mail_id du mail
-;;     dont le detail REMPLACE la liste, dans le panneau (pas de popup).
-;;     Remis a "" par ui.sh quand on change de panneau : sinon le panneau
-;;     mails se rouvrirait sur un detail au lieu de la liste.
-(defvar mail_ouvert "")
-
-;; :initial inclut "by_id":{} : sans ca, digest.by_id vaut null tant que
-;; fetch-digest.sh n'a pas rendu son premier resultat, et indexer [id]
-;; dessus plante le rendu du widget entier ("Unable to index into value
-;; null" dans eww-daemon.out.log) -- constate en prod le 12/08.
-(defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
-  "bash ~/.config/eww/fetch-digest.sh")
-
-;; --- Item : clic -> detail du mail, a la place de la liste ---------------
-;; Simple "eww update" (chemin absolu du binaire, comme dans les scripts) :
-;; il n'y a plus de fenetre a ouvrir, juste une variable a changer.
-(defwidget mail_item [it]
-  (eventbox :class "item"
-            :onclick "~/.cargo/bin/eww update mail_ouvert='${it.mail_id}'"
-    (box :orientation "v" :space-evenly false :hexpand true
-      (label :class "item-subject ${it.read ? '' : 'nonlu'}"
-             :halign "start" :hexpand true :wrap false :truncate true
-             :text "  ${it.urgent ? '⚠ ' : ''}${it.read ? '' : '● '}${it.subject_short}")
-      (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
-             :text "      ${it.meta}"))))
-
-(defwidget section [label items]
-  (box :class "section" :orientation "v" :space-evenly false
-    (label :class "sect-label" :halign "start" :text "► ${label}")
-    (for it in {items ?: []}
-      (mail_item :it it))))
-
-;; --- Detail d'un mail, affiche A LA PLACE de la liste (etape 7) ----------
-;; Bouton ← : retour a la liste. Le mail est passe deja resolu par
-;; digest_box, avec un repli "{}" a CHAQUE niveau d'indexation (digest.by_id
-;; lui-meme peut etre null avant le premier fetch, et by_id[mail_ouvert]
-;; l'est si l'id est vide ou absent) : indexer un champ sur null plante le
-;; rendu du widget entier (constate le 12/08).
-(defwidget mail_detail [mail]
-  (box :class "mail-detail" :orientation "v" :space-evenly false :vexpand true
-    (box :class "detail-head" :orientation "h" :space-evenly false
-      (button :class "retour-btn" :valign "start"
-              :onclick "~/.cargo/bin/eww update mail_ouvert=''" "←")
-      (label :class "side-title" :halign "start" :hexpand true :wrap true :xalign 0
-             :text {mail.subject ?: ''}))
-    (label :class "side-from" :halign "start" :wrap true :xalign 0
-           :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
-    (label :class "side-badges" :halign "start"
-           :text "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}")
-    (label :class "side-reason" :halign "start" :wrap true :xalign 0
-           :text {mail.reason ?: ''})
-    (side_summary :text {mail.summary ?: ''})
-    ;; 3 derniers = placeholders a cabler plus tard
-    (action_bar
-      (button :class "action-btn" :onclick "xdg-open '${mail.url ?: ''}'" "Ouvrir email")
-      (button :class "action-btn" "Action 2")
-      (button :class "action-btn" "Action 3")
-      (button :class "action-btn" "Action 4"))))
-
-;; --- Panneau : la liste OU le detail, jamais les deux ---------------------
-;; Deux zones de defilement distinctes, une seule visible (:visible libere
-;; la place, voir panel). La liste n'est que MASQUEE pendant le detail : au
-;; retour, elle revient telle quelle, a la meme position de defilement --
-;; avec un seul scroll partage, un detail plus court la ramenerait en haut.
-(defwidget digest_box []
-  (panel :id "mail" :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
-         :resume {digest.resume ?: ''} :semi ""
-    (box :orientation "v" :space-evenly false :vexpand true :visible {mail_ouvert == ""}
-      (defil
-        (box :orientation "v" :space-evenly false
-          (for s in {digest.sections ?: []}
-            (section :label {s.label} :items {s.items})))))
-    (box :orientation "v" :space-evenly false :vexpand true :visible {mail_ouvert != ""}
-      (defil
-        (mail_detail :mail {(digest.by_id ?: {})[mail_ouvert] ?: {}})))))
+;; Hauteurs (provisoire, etape 0) : les trois panneaux ont :vexpand true,
+;; c'est donc GTK qui leur partage la hauteur de la colonne. Le corps est un
+;; scroll : sa hauteur "minimale" est quasi nulle, GTK donne donc a peu pres
+;; un tiers de la place libre a chaque panneau, et le contenu qui depasse
+;; defile. A l'etape 2, chaque panneau recevra une :height calculee par le
+;; script de mise en page a la place.
+(defwidget panel [title sync source resume]
+  (box :class "panel" :orientation "v" :space-evenly false :vexpand true
+    ;; En-tete : plus cliquable (plus d'accordeon), c'est une simple box.
+    (box :class "header" :orientation "h" :space-evenly false
+      (label :class "title" :halign "start" :hexpand true :text title)
+      (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
+      ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
+      ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
+      ;; de la colonne (c'est pour ca que l'accordeon ne la montrait que sur
+      ;; le panneau deplie).
+      ;; :timeout "15s" : eww TUE une commande onclick au bout de son
+      ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
+      ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
+      ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
+      ;; d'avoir mis a jour le panneau.
+      (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
+              :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
+    (box :class "sep")
+    ;; Le scroll (vertical seulement) absorbe le contenu qui depasse la
+    ;; hauteur disponible ; les labels non wrappes ont :truncate true pour
+    ;; ne pas elargir la fenetre.
+    (scroll :class "sections" :vscroll true :hscroll false :vexpand true
+      (box :orientation "v" :space-evenly false
+        (children)))))
 
 
 ;; ==========================================================================
 ;;  RECOMMANDATIONS DU JOUR  (auto-refresh 20 min)
 ;; ==========================================================================
-;; :initial avec une synthese : avant la 1re reponse de n8n, la ligne
-;; semi-ouverte affiche "Chargement…" au lieu de disparaitre.
-(defpoll recos :interval "20m" :initial "{\"synthese\":\"Chargement…\"}"
+(defpoll recos :interval "20m" :initial "{\"recommandations\":[]}"
   "bash ~/.config/eww/fetch-recos.sh")
 
 (defwidget reco_card [reco]
@@ -211,24 +82,23 @@
            :text {reco.detail ?: ''})))
 
 (defwidget recos_box []
-  (panel :id "reco" :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
-         :resume {recos.resume ?: ''} :semi {recos.synthese ?: ''}
-    (defil
-      (label :class "reco-empty" :halign "start" :wrap true
-             :visible {arraylength(recos.recommandations ?: []) == 0}
-             :text "Aucune recommandation pour le moment.")
-      (box :orientation "v" :space-evenly false
-        (for reco in {recos.recommandations ?: []}
-          (reco_card :reco reco))))))
+  (panel :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
+         :resume {recos.resume ?: ''}
+    (label :class "reco-empty" :halign "start" :wrap true
+           :visible {arraylength(recos.recommandations ?: []) == 0}
+           :text "Aucune recommandation pour le moment.")
+    (box :orientation "v" :space-evenly false
+      (for reco in {recos.recommandations ?: []}
+        (reco_card :reco reco)))))
 
 
 ;; ==========================================================================
 ;;  A VENIR  (evenements agenda + taches datees ; auto-refresh 10 min)
 ;; ==========================================================================
-;; Remplace l'ancien panneau AGENDA (etape 6 de la refonte). La liste arrive
-;; DEJA fusionnee, triee, groupee et resumee par n8n : voir fetch-venir.sh
-;; pour le contrat de donnees. eww ne fait qu'afficher : un groupe = un titre
-;; + ses lignes, le glyphe distingue les deux sources. Pas de detail au clic.
+;; La liste arrive DEJA fusionnee, triee, groupee et resumee par n8n : voir
+;; fetch-venir.sh pour le contrat de donnees. eww ne fait qu'afficher : un
+;; groupe = un titre + ses lignes, le glyphe distingue les deux sources.
+;; Pas de detail au clic.
 (defpoll venir :interval "10m" :initial "{\"groupes\":[]}"
   "bash ~/.config/eww/fetch-venir.sh")
 
@@ -253,19 +123,54 @@
       (venir_item :it it :cle {g.cle}))))
 
 (defwidget venir_box []
-  (panel :id "venir" :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
-         :resume {venir.resume ?: ''} :semi ""
-    (defil
-      (label :class "venir-vide" :halign "start" :wrap true
-             :visible {arraylength(venir.groupes ?: []) == 0}
-             :text "Rien à venir.")
-      (box :orientation "v" :space-evenly false
-        (for g in {venir.groupes ?: []}
-          (venir_groupe :g g))))))
+  (panel :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
+         :resume {venir.resume ?: ''}
+    (label :class "venir-vide" :halign "start" :wrap true
+           :visible {arraylength(venir.groupes ?: []) == 0}
+           :text "Rien à venir.")
+    (box :orientation "v" :space-evenly false
+      (for g in {venir.groupes ?: []}
+        (venir_groupe :g g)))))
 
 
 ;; ==========================================================================
-;;  BANDEAU  (bas de la colonne : une ligne fixe, jamais depliable)
+;;  BOITE DE RECEPTION  (auto-refresh 5 min)
+;; ==========================================================================
+;; :initial inclut "by_id":{} : sans ca, digest.by_id vaut null tant que
+;; fetch-digest.sh n'a pas rendu son premier resultat, et indexer [id]
+;; dessus plante le rendu du widget entier ("Unable to index into value
+;; null" dans eww-daemon.out.log) -- constate en prod le 12/08. by_id n'est
+;; plus lu depuis l'etape 0 ; il le sera de nouveau par la modale (etape 5).
+(defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
+  "bash ~/.config/eww/fetch-digest.sh")
+
+;; --- Ligne de mail : pas de clic pour l'instant. Le detail in-place a ete
+;;     retire a l'etape 0 ; le clic ouvrira la modale a l'etape 5. D'ici la,
+;;     une simple box : aucun clic a capter.
+(defwidget mail_item [it]
+  (box :class "item" :orientation "v" :space-evenly false :hexpand true
+    (label :class "item-subject ${it.read ? '' : 'nonlu'}"
+           :halign "start" :hexpand true :wrap false :truncate true
+           :text "  ${it.urgent ? '⚠ ' : ''}${it.read ? '' : '● '}${it.subject_short}")
+    (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
+           :text "      ${it.meta}")))
+
+(defwidget section [label items]
+  (box :class "section" :orientation "v" :space-evenly false
+    (label :class "sect-label" :halign "start" :text "► ${label}")
+    (for it in {items ?: []}
+      (mail_item :it it))))
+
+(defwidget digest_box []
+  (panel :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
+         :resume {digest.resume ?: ''}
+    (box :orientation "v" :space-evenly false
+      (for s in {digest.sections ?: []}
+        (section :label {s.label} :items {s.items})))))
+
+
+;; ==========================================================================
+;;  BANDEAU  (bas de la colonne : une ligne fixe)
 ;; ==========================================================================
 ;; Tout est calcule en local, sans n8n :
 ;;  - horloge : 10 s suffisent, l'heure n'affiche que les minutes.
@@ -302,22 +207,21 @@
 
 
 ;; ==========================================================================
-;;  FENETRES  (toutes : ecran 0 par defaut, --screen impose par start.sh/ui.sh)
+;;  FENETRES  (ecran 0 par defaut, --screen impose par start.sh)
 ;; ==========================================================================
 
 ;; --- La colonne : UNE seule fenetre pour tous les panneaux (refonte 09/2026)
 ;; Pourquoi une seule fenetre : avant, chaque panneau avait la sienne, et
 ;; tout changement de taille obligeait a recalculer a la main la geometrie
-;; des autres. Ici les panneaux sont empiles dans une vbox, et c'est GTK qui
-;; repartit la hauteur entre eux, a l'interieur d'une fenetre de hauteur
-;; FIXE (c'est ce qui collera le bandeau en bas, a l'etape 5).
+;; des autres. Ici les panneaux sont empiles dans une vbox, a l'interieur
+;; d'une fenetre de hauteur FIXE (c'est ce qui colle le bandeau en bas).
 ;;
 ;; Geometrie : eww 0.6.0 refuse de melanger les unites dans une meme valeur
 ;; ("96%-24px" -> "Invalid unit", teste le 10/09). On garde donc le haut a
 ;; 24px comme avant et une hauteur en % : 93% laisse >= 30px sous la
-;; colonne, sur le portable (768) comme sur l'externe (1080), pour le
-;; panneau LXQt masquable. Les % sont relatifs a l'ecran passe par --screen :
-;; la colonne s'adapte seule a l'ecran choisi par start.sh.
+;; colonne, sur le portable (768) comme sur l'externe (1080). Les % sont
+;; relatifs a l'ecran passe par --screen : la colonne s'adapte seule a
+;; l'ecran choisi par start.sh.
 ;;
 ;; Picom floute TOUTE la surface d'une fenetre Eww (voir picom.conf) : les
 ;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
@@ -332,11 +236,7 @@
     (recos_box)
     (venir_box)
     (digest_box)
-    ;; Dernier enfant : comme la fenetre a une hauteur FIXE et que le panneau
-    ;; ouvert absorbe toute la place libre (:vexpand), le bandeau reste colle
-    ;; en bas quel que soit le panneau ouvert.
+    ;; Dernier enfant : la fenetre a une hauteur FIXE et les trois panneaux
+    ;; absorbent toute la place libre (:vexpand) : le bandeau, lui, garde sa
+    ;; hauteur naturelle et reste colle en bas.
     (bandeau)))
-
-;; (Les popups de detail -- fenetres "detail" et "ev_detail" -- ont disparu
-;; aux etapes 6 et 7 de la refonte : la colonne est desormais la SEULE
-;; fenetre du dashboard, le detail d'un mail s'affiche dans son panneau.)

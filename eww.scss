@@ -16,31 +16,27 @@ window { background-color: transparent; }
   font-size: 15px;
 }
 
-.header { margin-bottom: 4px; }
-.title  { font-weight: bold; }
-
-/* accordeon : chevron (ferme / ouvert) devant le titre, en-tete cliquable.
-   ATTENTION : ce fichier doit rester 100% ASCII, commentaires compris. Un
+/* ATTENTION : ce fichier doit rester 100% ASCII, commentaires compris. Un
    seul caractere non ASCII et le compilateur sass ajoute '@charset "UTF-8";'
    en tete du CSS, regle que GTK refuse ("unknown @ rule") : TOUTE la feuille
    de style saute (constate le 10/09). */
-.chevron { margin-right: 8px; }
-.panel-head:hover .title,
-.panel-head:hover .chevron { color: #8ecae6; }
-/* margin-left 28px : ecarte le bloc "sync hh:mm + bouton" du resume qui le
-   precede dans l'en-tete (12px trop serre, retour utilisateur 10/09) */
-.synced { font-size: 12px; color: white; margin-left: 28px; }
 
-/* ligne semi-ouverte des recommandations (panneau replie) : alignee sous
-   le titre (apres le chevron), un peu plus petite que le corps */
-.synthese {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
-  margin: 6px 0 0 20px;
-}
+.header { margin-bottom: 4px; }
+.title  { font-weight: bold; }
 
-/* resume a droite de l'en-tete ("8 a traiter"...), visible replie ou non */
+/* resume a droite de l'en-tete ("8 a traiter"...) */
 .resume { font-size: 13px; color: rgba(255, 255, 255, 0.75); margin-left: 12px; }
+
+/* infobulle du bouton de synchro ("sync hh:mm") : "* { all: unset; }" la
+   rendrait transparente et illisible sur le fond d'ecran */
+tooltip {
+  background-color: rgba(20, 20, 20, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 4px 8px;
+  color: white;
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+}
 
 .sep {
   background-color: white;
@@ -77,42 +73,13 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 }
 .sync-icon:hover { color: #8ecae6; }
 
-/* --- Digest : items cliquables (survol / lu-non lu) ---------------------- */
+/* --- Boite de reception : lignes de mail (lu / non lu) ------------------ */
+/* Pas de :hover depuis l'etape 0 : les lignes ne sont plus cliquables (le
+   survol suggererait le contraire). Il reviendra avec la modale (etape 5). */
 .item { background-color: transparent; border: none; padding: 2px 4px;  }
-.item:hover { background-color: rgba(255, 255, 255, 0.12); }
 .item-subject { color: white; }
 .item-subject.nonlu { font-weight: bold; }
 .item-meta { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
-
-/* --- Digest : detail d'un mail (dans le panneau, a la place de la liste) - */
-.side-title   { font-weight: bold; margin-bottom: 6px; }
-.side-from    { font-size: 12px; color: rgba(255, 255, 255, 0.70); margin-bottom: 4px; }
-.side-badges  { font-size: 11px; color: rgba(255, 255, 255, 0.60); margin-bottom: 8px; }
-.side-reason  { color: white; margin-bottom: 8px; }
-.side-summary { color: rgba(255, 255, 255, 0.85); margin-bottom: 8px; }
-
-.detail-head { margin-bottom: 4px; }
-/* bouton de retour a la liste, a gauche du sujet */
-.retour-btn {
-  font-size: 22px;
-  color: white;
-  padding: 0 10px 0 0;
-  background-color: transparent;
-}
-.retour-btn:hover { color: #8ecae6; }
-
-/* separateur intent/classification <-> contenu (summary) */
-.side-sep { min-height: 1px; background-color: rgba(255, 255, 255, 0.30); margin: 10px 0; }
-
-/* barre d'actions en bas du detail */
-.detail-actions { margin-top: 10px; }
-.action-btn {
-  margin: 0 3px; padding: 6px 8px;
-  border: 1px solid white; color: white;
-  background-color: rgba(255, 255, 255, 0.06);
-  font-size: 12px;
-}
-.action-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
 
 /* --- Recommandations du jour --------------------------------- */
 .reco-card {

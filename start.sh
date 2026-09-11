@@ -84,9 +84,9 @@ RUST_LOG=debug "$EWW" daemon > "$HOME/.cache/eww/eww-daemon.out.log" 2>&1 &
 sleep 1.5
 
 # Le survol (et le demon hoverd.sh / pipe FIFO qui le pilotait) a ete retire
-# le 12/08 -- voir eww.yuck et ui.sh. Seul le clic subsiste desormais ; il
-# n'a besoin d'aucun demon dedie (un simple "eww update" par ui.sh suffit,
-# pas de risque de course sur un clic comme il y en avait sur un survol).
+# le 12/08 -- voir eww.yuck. Seul le clic subsiste desormais ; il n'a besoin
+# d'aucun demon dedie (pas de risque de course sur un clic comme il y en
+# avait sur un survol).
 pkill -f "bash .*/hoverd\.sh" 2>/dev/null   # au cas ou une vieille instance trainerait
 
 # --- Surveillant anti-blocage (24/08) --------------------------------------
@@ -136,6 +136,6 @@ printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
 "$EWW" open  colonne --screen "$TARGET"
 
 # (Jusqu'a la refonte en colonne, des fenetres de detail etaient ouvertes a
-# la demande par ui.sh. Le detail d'un mail s'affiche desormais DANS la
-# colonne : "colonne" est la seule fenetre. target_screen, enregistre
+# la demande par ui.sh, supprime a l'etape 0 de la colonne elastique :
+# "colonne" est pour l'instant la seule fenetre. target_screen, enregistre
 # ci-dessus, reste utilise par eww-watchdog.sh pour la rouvrir.)

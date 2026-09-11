@@ -5,10 +5,10 @@
 # { titre, detail, priorite } et ajoute une heure de synchro locale.
 # Repli sur {"recommandations":[]} si injoignable.
 # Accepte aussi le format cible du brief (09/2026) :
-#   { "synthese": "...", "actions": [ {rang, titre, contexte, urgent} ] }
-# "synthese" = la priorite du jour en UNE phrase, ecrite par le LLM cote n8n
-# (pas tronquee ici : une troncature couperait au milieu d'un mot). Tant que
-# n8n ne la fournit pas, repli sur le titre de la recommandation n°1.
+#   { "actions": [ {rang, titre, contexte, urgent} ] }
+# (Le champ "synthese" qu'attendait l'etat semi-ouvert de l'accordeon n'est
+# plus lu depuis l'etape 0 de la colonne elastique : inutile de le produire
+# cote n8n.)
 
 # ⚠️  A PERSONNALISER : mettez ici l'URL de PRODUCTION de votre webhook n8n "recos"
 #     (workflow active + chemin /webhook/ , pas /webhook-test/).
@@ -38,20 +38,6 @@ def find_list(x):
                 return find_list(x[k])
     return []
 
-def find_text(x, key):
-    """Cherche un champ texte (ex: synthese) dans la meme enveloppe n8n."""
-    if isinstance(x, list):
-        return find_text(x[0], key) if len(x) == 1 else ""
-    if isinstance(x, dict):
-        if isinstance(x.get(key), str):
-            return x[key].strip()
-        for k in ("body", "data", "json"):
-            if isinstance(x.get(k), (dict, list)):
-                v = find_text(x[k], key)
-                if v:
-                    return v
-    return ""
-
 PRIO = {"high": "haute", "medium": "moyenne", "low": "basse",
         "1": "haute", "2": "moyenne", "3": "basse",
         "haute": "haute", "moyenne": "moyenne", "basse": "basse"}
@@ -79,15 +65,8 @@ n = len(items)
 if n == 0:   resume = "aucune action"
 elif n == 1: resume = "1 action"
 else:        resume = f"{n} actions"
-# synthese = ligne affichee sous l en-tete quand le panneau est replie
-# ("semi-ouvert"). Jamais vide : le panneau ne doit jamais tenir sur une
-# seule ligne.
-synthese = (find_text(raw, "synthese")
-            or (items[0]["titre"] if items else "")
-            or "Aucune recommandation pour le moment.")
 out = {"recommandations": items,
        "resume": resume,
-       "synthese": synthese,
        "sync": datetime.datetime.now().strftime("%H:%M")}
 print(json.dumps(out, ensure_ascii=False))
 '
