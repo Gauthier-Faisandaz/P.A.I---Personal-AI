@@ -26,7 +26,9 @@
 
 # >>> A COMPLETER : URL de PRODUCTION du webhook n8n "A VENIR" <<<
 URL=""
-EXEMPLE="$HOME/.config/eww/exemples/a-venir.json"
+# VENIR_EXEMPLE permet de tester un autre fichier sans toucher a celui-ci :
+#   VENIR_EXEMPLE=/tmp/gros.json bash ~/.config/eww/sync.sh venir
+EXEMPLE="${VENIR_EXEMPLE:-$HOME/.config/eww/exemples/a-venir.json}"
 
 if [ -n "$URL" ]; then
   OUT="$(curl -s --netrc --max-time 8 "$URL")"
@@ -101,4 +103,4 @@ if not resume and not groupes:
 
 print(json.dumps({"synchro": synchro, "resume": resume, "groupes": groupes},
                  ensure_ascii=False))
-' "$SOURCE"
+' "$SOURCE" | bash "$HOME/.config/eww/publier.sh" venir   # copie dans le bus + recalcul des hauteurs

@@ -65,5 +65,5 @@ n=len(buckets.get("a_traiter",[]))
 resume=f"{n} à traiter" if n else "rien à traiter"
 print(json.dumps({"sections":sections,"by_id":by_id,"resume":resume,
                   "sync":datetime.datetime.now().strftime("%H:%M")},ensure_ascii=False))
-'
+' | bash "$HOME/.config/eww/publier.sh" digest   # copie dans le bus + recalcul des hauteurs
 

@@ -9,15 +9,20 @@ l'ecran. En calculant nous-memes les hauteurs, on connait aussi les y, et
 la modale (etape 5) pourra s'aligner sur le haut de son panneau.
 
 Usage :
-  mise-en-page.py          lit les donnees actuelles des panneaux (eww get)
-                           et affiche le resultat. N'envoie RIEN a eww pour
-                           l'instant (branchement = etape 2).
+  mise-en-page.py          lit les donnees actuelles des panneaux (le bus :
+                           ~/.cache/eww/bus/*.json) et affiche le resultat,
+                           sans rien envoyer a eww.
+  mise-en-page.py --pousser
+                           meme calcul, puis envoie les six variables a eww
+                           (h_reco h_venir h_mail y_reco y_venir y_mail).
+                           Lance par publier.sh apres chaque fetch-*.sh.
   mise-en-page.py test     verifie l'algorithme sur le tableau de reference
                            du brief (section 3), plus des invariants.
   mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9
                            meme calcul sur des donnees inventees.
 """
 import argparse
+import fcntl
 import json
 import math
 import os
@@ -29,6 +34,7 @@ from dataclasses import dataclass
 
 EWW = os.path.expanduser("~/.cargo/bin/eww")
 CACHE = os.path.expanduser("~/.cache/eww")
+BUS = os.path.join(CACHE, "bus")          # rempli par publier.sh
 
 
 # ==========================================================================
@@ -243,13 +249,15 @@ def geometrie():
     return h_col, int(W * LARGEUR_PCT / 100), marge, ecran
 
 
-def lire_eww(nom):
-    """Valeur actuelle d'une variable eww (le JSON que le panneau affiche)."""
+def lire_bus(nom):
+    """Derniere reponse de fetch-<nom>.sh, deposee par publier.sh. Fichier
+    absent (tout premier demarrage) ou illisible : panneau compte vide. Pas
+    grave : il sera recalcule des que ce fetch aura repondu."""
     try:
-        sortie = subprocess.run([EWW, "get", nom], capture_output=True,
-                                text=True, timeout=3).stdout
-        return json.loads(sortie or "{}")
-    except (subprocess.SubprocessError, json.JSONDecodeError):
+        with open(os.path.join(BUS, f"{nom}.json")) as f:
+            donnees = json.load(f)
+        return donnees if isinstance(donnees, dict) else {}
+    except (OSError, json.JSONDecodeError):
         return {}
 
 
@@ -273,6 +281,19 @@ NOMS = ("Recommandations", "À venir", "Boîte de réception")
 VARS = ("reco", "venir", "mail")
 
 
+def affectations(res):
+    """["h_reco=128", ..., "y_mail=518"] : les six variables pour eww."""
+    return ([f"h_{v}={x}" for v, x in zip(VARS, res["h"])] +
+            [f"y_{v}={x}" for v, x in zip(VARS, res["y"])])
+
+
+def pousser(res):
+    """UN seul "eww update" pour les six variables : les trois panneaux
+    changent de taille dans le meme rendu, sans etat intermediaire ou la
+    colonne serait trop haute ou trop courte."""
+    subprocess.run([EWW, "update", *affectations(res)], timeout=5, check=False)
+
+
 def afficher(res):
     print(f"{'':20}{'besoin':>8}{'hauteur':>9}{'%':>5}{'y':>6}")
     for i, nom in enumerate(NOMS):
@@ -280,9 +301,7 @@ def afficher(res):
         print(f"{nom:20}{res['besoin'][i]:>8}{res['h'][i]:>9}"
               f"{round(100 * res['h'][i] / res['A']):>5}{res['y'][i]:>6}{coupe}")
     print(f"{'total':20}{'':>8}{sum(res['h']):>9}   (A = {res['A']})")
-    cmd = " ".join([f"h_{v}={x}" for v, x in zip(VARS, res["h"])] +
-                   [f"y_{v}={x}" for v, x in zip(VARS, res["y"])])
-    print(f"\nà l'étape 2, le script enverra :  eww update {cmd}")
+    print(f"\ncommande envoyée par --pousser :  eww update {' '.join(affectations(res))}")
 
 
 def test():
@@ -344,17 +363,34 @@ def main():
     p.add_argument("--groupes", type=int, default=4, help="répartis en N groupes")
     p.add_argument("--mails", type=int, default=0)
     p.add_argument("--sections", type=int, default=1, help="mails répartis en N sections")
+    p.add_argument("--pousser", action="store_true",
+                   help="envoyer le résultat à eww (utilisé par publier.sh)")
     a = p.parse_args()
 
     if a.mode == "test":
         sys.exit(0 if test() else 1)
+
+    if a.pousser:
+        # Au demarrage, les trois fetch finissent presque en meme temps et
+        # lancent chacun un calcul. Le verrou les fait passer l'un APRES
+        # l'autre : chacun relit le bus une fois son tour venu, donc le
+        # dernier a passer voit forcement les trois fichiers a jour -- et
+        # c'est lui qui ecrit en dernier dans eww.
+        with open(os.path.join(CACHE, "mise-en-page.lock"), "w") as verrou:
+            fcntl.flock(verrou, fcntl.LOCK_EX)
+            h_col, largeur, marge, _ = geometrie()
+            res = calculer(lire_bus("recos"), lire_bus("venir"), lire_bus("digest"),
+                           REELLES, h_col, largeur, marge)
+            pousser(res)
+            print(" ".join(affectations(res)))      # -> mise-en-page.log
+        return
 
     h_col, largeur, marge, ecran = geometrie()
     if a.mode == "simuler":
         donnees = factices(a.recos, a.venir, a.groupes, a.mails, a.sections)
         origine = "données simulées"
     else:
-        donnees = (lire_eww("recos"), lire_eww("venir"), lire_eww("digest"))
+        donnees = (lire_bus("recos"), lire_bus("venir"), lire_bus("digest"))
         origine = "données actuelles des panneaux"
     res = calculer(*donnees, REELLES, h_col, largeur, marge)
     print(f"Écran {ecran} : colonne {largeur} x {h_col} px, marge {marge} px, "

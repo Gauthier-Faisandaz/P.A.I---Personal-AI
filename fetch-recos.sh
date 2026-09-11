@@ -69,4 +69,4 @@ out = {"recommandations": items,
        "resume": resume,
        "sync": datetime.datetime.now().strftime("%H:%M")}
 print(json.dumps(out, ensure_ascii=False))
-'
+' | bash "$HOME/.config/eww/publier.sh" recos   # copie dans le bus + recalcul des hauteurs

@@ -16,12 +16,25 @@
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
 ;;   - variables digest recos venir         -> sync.sh
+;;   - variables h_* y_* (hauteurs, y)      -> mise-en-page.py
 ;;   - fenetre colonne                      -> start.sh, eww-watchdog.sh
 
 
 ;; ==========================================================================
 ;;  WIDGETS COMMUNS
 ;; ==========================================================================
+
+;; --- Hauteur de chaque panneau et position de son bord haut (px) ---------
+;; Calculees par mise-en-page.py, envoyees en UN seul "eww update" apres
+;; chaque arrivee de donnees (voir publier.sh). Les y_* ne servent pas
+;; encore : la modale mail (etape 5) s'alignera sur y_mail.
+;; 0 = pas encore calcule (voir le widget panel ci-dessous).
+(defvar h_reco 0)
+(defvar h_venir 0)
+(defvar h_mail 0)
+(defvar y_reco 0)
+(defvar y_venir 0)
+(defvar y_mail 0)
 
 ;; --- Panneau principal : en-tete (titre, resume, bouton ↻), puis le corps
 ;;     (separateur + zone de defilement) ---------------------------------
@@ -33,14 +46,18 @@
 ;; resume = texte court affiche a droite de l'en-tete ("8 à traiter"...),
 ;;          pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
 ;;
-;; Hauteurs (provisoire, etape 0) : les trois panneaux ont :vexpand true,
-;; c'est donc GTK qui leur partage la hauteur de la colonne. Le corps est un
-;; scroll : sa hauteur "minimale" est quasi nulle, GTK donne donc a peu pres
-;; un tiers de la place libre a chaque panneau, et le contenu qui depasse
-;; defile. A l'etape 2, chaque panneau recevra une :height calculee par le
-;; script de mise en page a la place.
-(defwidget panel [title sync source resume]
+;; hauteur = hauteur TOTALE du panneau en px, bordures comprises (h_reco...)
+;;
+;; Hauteurs : c'est mise-en-page.py qui les decide (repartition elastique),
+;; eww ne fait que les appliquer avec :height. Les trois hauteurs + le
+;; bandeau + les ecarts font exactement la hauteur de la fenetre : GTK n'a
+;; plus de place libre a distribuer. :vexpand reste la comme filet : tant
+;; que les hauteurs valent 0 (avant le premier calcul), GTK partage la
+;; place en tiers, comme a l'etape 0, au lieu de tout tasser en haut.
+;; Le corps est un scroll : ce qui ne tient pas dans la hauteur defile.
+(defwidget panel [title sync source resume hauteur]
   (box :class "panel" :orientation "v" :space-evenly false :vexpand true
+       :height hauteur
     ;; En-tete : plus cliquable (plus d'accordeon), c'est une simple box.
     (box :class "header" :orientation "h" :space-evenly false
       (label :class "title" :halign "start" :hexpand true :text title)
@@ -83,7 +100,7 @@
 
 (defwidget recos_box []
   (panel :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
-         :resume {recos.resume ?: ''}
+         :resume {recos.resume ?: ''} :hauteur h_reco
     (label :class "reco-empty" :halign "start" :wrap true
            :visible {arraylength(recos.recommandations ?: []) == 0}
            :text "Aucune recommandation pour le moment.")
@@ -124,7 +141,7 @@
 
 (defwidget venir_box []
   (panel :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
-         :resume {venir.resume ?: ''}
+         :resume {venir.resume ?: ''} :hauteur h_venir
     (label :class "venir-vide" :halign "start" :wrap true
            :visible {arraylength(venir.groupes ?: []) == 0}
            :text "Rien à venir.")
@@ -163,7 +180,7 @@
 
 (defwidget digest_box []
   (panel :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
-         :resume {digest.resume ?: ''}
+         :resume {digest.resume ?: ''} :hauteur h_mail
     (box :orientation "v" :space-evenly false
       (for s in {digest.sections ?: []}
         (section :label {s.label} :items {s.items})))))
@@ -242,7 +259,7 @@
     (recos_box)
     (venir_box)
     (digest_box)
-    ;; Dernier enfant : la fenetre a une hauteur FIXE et les trois panneaux
-    ;; absorbent toute la place libre (:vexpand) : le bandeau, lui, garde sa
-    ;; hauteur naturelle et reste colle en bas.
+    ;; Dernier enfant : la fenetre a une hauteur FIXE, et les hauteurs des
+    ;; trois panneaux (mise-en-page.py) remplissent exactement le reste :
+    ;; le bandeau garde sa hauteur naturelle et reste colle en bas.
     (bandeau)))
