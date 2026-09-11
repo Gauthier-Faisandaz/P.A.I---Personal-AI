@@ -45,8 +45,8 @@ $bandeau-haut:        38px;  /* + 2 x $bordure                          */
 /* Panneau replie : voile plus leger. Le texte reste dans le meme blanc
    qu'un panneau ouvert (choix utilisateur 11/09 : pas de gris-vert). */
 $fond-replie:         rgba(255, 255, 255, 0.05);
-/* Survol d'un en-tete cliquable : le chevron passe au jaune dore
-   (choix utilisateur 11/09). */
+/* Survol dans un en-tete : le chevron (zone cliquable) et le bouton de
+   synchro passent au jaune dore (choix utilisateur 11/09). */
 $accent-entete:       #f5c542;
 
 
@@ -133,7 +133,7 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   padding: 0 4px;
   background-color: transparent;
 }
-.sync-icon:hover { color: #8ecae6; }
+.sync-icon:hover { color: $accent-entete; }
 
 /* --- Boite de reception : lignes de mail cliquables (lu / non lu) ------- */
 /* .item est une eventbox (cliquable) : elle affiche son fond mais ignore
