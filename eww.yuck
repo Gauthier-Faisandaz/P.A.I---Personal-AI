@@ -236,6 +236,19 @@
     (box :class "side-sep")
     (label :class "side-summary" :halign "start" :wrap true :xalign 0 :text text)))
 
+;; --- Bouton d'action de la modale --------------------------------------
+;; commande = ligne shell lancee au clic ; "" = emplacement LIBRE : bouton
+;; inerte (:active false), en pointilles, avec une infobulle.
+;; setsid -f : la commande est detachee d'eww. Sinon eww la TUE a la fin de
+;; son :timeout (200ms par defaut, voir le bouton ↻) -- et un navigateur
+;; que xdg-open venait de lancer pouvait etre tue avec elle.
+(defwidget action [libelle commande]
+  (button :class "action-btn ${commande == '' ? 'a-definir' : ''}"
+          :active {commande != ''}
+          :tooltip {commande == '' ? 'Emplacement libre : action à définir (eww.yuck, modale_contenu)' : ''}
+          :onclick "setsid -f ${commande} >/dev/null 2>&1"
+          libelle))
+
 ;; Le mail est passe deja resolu, avec un repli "{}" a CHAQUE niveau
 ;; d'indexation : digest.by_id peut etre null avant le premier fetch, et
 ;; by_id[mail_modale] l'est si l'id est absent (mail disparu au dernier
@@ -264,13 +277,19 @@
         (label :class "side-reason" :halign "start" :wrap true :xalign 0
                :text {mail.reason ?: ''})
         (side_summary :text {mail.summary ?: ''})))
-    ;; Actions, toujours visibles en bas. 3 derniers = placeholders a
-    ;; cabler plus tard (etape 6).
+    ;; Actions, toujours visibles en bas. Ce sont ELLES qui agissent sur le
+    ;; mail (le clic sur la ligne ne fait qu'ouvrir la modale).
     (box :class "detail-actions" :orientation "h" :space-evenly true
-      (button :class "action-btn" :onclick "xdg-open '${mail.url ?: ''}'" "Ouvrir email")
-      (button :class "action-btn" "Action 2")
-      (button :class "action-btn" "Action 3")
-      (button :class "action-btn" "Action 4"))))
+      ;; Gmail web plutot que Thunderbird (choix du 11/09) : le JSON ne
+      ;; donne que l'id Gmail, Thunderbird n'aurait pu que s'ouvrir, sans
+      ;; afficher CE mail.
+      (action :libelle "Ouvrir email" :commande "xdg-open '${mail.url ?: ''}'")
+      ;; TODO : trois emplacements libres. Pour en cabler un : remplacer
+      ;; le libelle et mettre la commande shell (les champs du mail sont
+      ;; dans mail.*, ex. ${mail.mail_id}).
+      (action :libelle "à définir" :commande "")
+      (action :libelle "à définir" :commande "")
+      (action :libelle "à définir" :commande ""))))
 
 
 ;; ==========================================================================
