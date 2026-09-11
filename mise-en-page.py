@@ -33,7 +33,8 @@ Usage :
                            L'etat est garde dans ~/.cache/pai/replies.json :
                            il survit aux redemarrages d'eww et du PC.
                            Replier ou deplier un panneau, quel qu'il soit,
-                           ferme la modale si elle est ouverte.
+                           ferme la modale si elle est ouverte. Le passage
+                           d'un etat a l'autre est anime (~0,2 s).
   mise-en-page.py test     verifie l'algorithme sur les tableaux de reference
                            du brief v9 (sections 3 et 5), plus des invariants.
   mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 --veille 5 [--replies reco]
@@ -53,6 +54,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 from dataclasses import dataclass
 
 EWW = os.path.expanduser("~/.cargo/bin/eww")
@@ -336,6 +338,16 @@ PANNEAUX = (
 VARS = tuple(p.var for p in PANNEAUX)
 
 
+def positions(h, marge):
+    """y du bord haut de chaque panneau : y[i] = marge + somme des
+    (h[j] + ecart) pour j < i."""
+    y, bord = [], marge
+    for hi in h:
+        y.append(bord)
+        bord += hi + ECART
+    return y
+
+
 def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset(),
              panneaux=PANNEAUX):
     """Tout le calcul : besoins -> hauteurs -> positions y.
@@ -349,18 +361,17 @@ def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset(),
     besoins = [p.besoin(donnees.get(p.bus) or {}, c, largeur) for p in panneaux]
     replie = [p.var in replies for p in panneaux]
     h = repartir(A, besoins, c.plancher, replie, c.replie)
-    # y[i] = marge + somme des (h[j] + ecart) pour j < i
-    y, bord = [], marge
-    for hi in h:
-        y.append(bord)
-        bord += hi + ECART
+    y = positions(h, marge)
     # Tronque = du TEXTE est cache. Rogner seulement la decoration sous le
     # dernier element (padding + trait d'une reco, padding d'une ligne)
     # ne cache rien de lisible : pas de chevron ni de degrade pour ca. Un
     # panneau replie n'est jamais "tronque" : il n'a plus de liste.
     tronque = [not r and b - hi > p.decor_fin
                for p, r, hi, b in zip(panneaux, replie, h, besoins)]
-    return {"A": A, "besoin": besoins, "h": h, "y": y,
+    # seuil = hauteur a partir de laquelle un panneau OUVERT peut afficher
+    # son corps sans deborder : le plancher. Utile pendant l'animation, ou
+    # un panneau qui se deplie passe par des hauteurs plus petites.
+    return {"A": A, "besoin": besoins, "h": h, "y": y, "seuil": c.plancher,
             "tronque": tronque, "replie": replie, "panneaux": panneaux}
 
 
@@ -465,12 +476,14 @@ def factices(recos=0, venir=0, groupes=4, mails=0, sections=1, veille=0):
 #  SORTIES
 # ==========================================================================
 def affectations(res):
-    """["h_reco=128", ..., "r_veille=false"] : les variables pour eww."""
+    """["h_reco=128", ..., "r_veille=false", "seuil_corps=100"] : les
+    variables pour eww."""
     noms = [p.var for p in res["panneaux"]]
     return ([f"h_{v}={x}" for v, x in zip(noms, res["h"])] +
             [f"y_{v}={x}" for v, x in zip(noms, res["y"])] +
             [f"t_{v}={'true' if t else 'false'}" for v, t in zip(noms, res["tronque"])] +
-            [f"r_{v}={'true' if r else 'false'}" for v, r in zip(noms, res["replie"])])
+            [f"r_{v}={'true' if r else 'false'}" for v, r in zip(noms, res["replie"])] +
+            [f"seuil_corps={res['seuil']}"])
 
 
 def pousser(res):
@@ -516,6 +529,79 @@ def fermer_modale():
         print("eww ne répond pas : modale non fermée", file=sys.stderr)
 
 
+# ==========================================================================
+#  ANIMATION DU REPLI / DEPLI
+# ==========================================================================
+# Pourquoi ici et pas dans eww : GTK3 ne sait pas animer une hauteur
+# imposee par :height (ses transitions CSS se limitent aux couleurs et
+# autres proprietes de style), et un "revealer" eww n'anime qu'UN panneau :
+# les autres sauteraient d'un coup a leur nouvelle hauteur, et la colonne
+# deborderait le temps de l'animation (bandeau pousse hors de l'ecran).
+# On anime donc ici : au clic, une suite d'images intermediaires, chacune
+# poussee en un "eww update", ou TOUS les panneaux glissent ensemble.
+# Depart et arrivee font chacun A au total : chaque image aussi, le bandeau
+# ne bouge jamais.
+# 8 images en 0,2 s : un "eww update" coute ~20 ms (mesure le 11/09), il
+# reste ~5 ms de marge par image. Plus d'images n'irait pas plus vite : eww
+# ne suivrait pas. S'il prend du retard, l'animation dure un peu plus, mais
+# la derniere image est toujours l'arrivee exacte.
+ANIM_IMAGES = 8
+ANIM_DUREE = 0.20      # s
+
+
+def images(depart, arrivee, n=ANIM_IMAGES):
+    """Hauteurs des images 1..n ; la derniere est EXACTEMENT l'arrivee.
+    Ralenti en fin de mouvement (courbe "ease-out" cubique) : ca part vite
+    et se pose doucement, comme un tiroir qu'on referme. Chaque image est
+    arrondie au plus fort reste sur le total interpole : si depart et
+    arrivee font A, chaque image fait A au pixel pres."""
+    suite = []
+    for k in range(1, n + 1):
+        p = 1 - (1 - k / n) ** 3
+        hs = [a + (b - a) * p for a, b in zip(depart, arrivee)]
+        suite.append(arrondir(hs, round(sum(hs))))
+    suite[-1] = list(arrivee)
+    return suite
+
+
+def hauteurs_affichees():
+    """Hauteurs a l'ecran en ce moment (h_* dans eww) : le point de depart
+    de l'animation. Un seul appel ("eww state"). None si eww ne les connait
+    pas encore (0 = jamais calcule) ou ne repond pas : on pousse alors
+    l'arrivee directement, sans animation."""
+    try:
+        etat = subprocess.run([EWW, "state"], capture_output=True, text=True,
+                              timeout=1, env=ENV_EWW).stdout
+    except subprocess.TimeoutExpired:
+        return None
+    h = []
+    for p in PANNEAUX:
+        m = re.search(rf"^h_{p.var}: *(\d+)\s*$", etat, re.M)
+        if not m or int(m[1]) == 0:
+            return None
+        h.append(int(m[1]))
+    return h
+
+
+def animer(depart, res):
+    """Pousse les images de depart vers res a cadence reguliere, puis res
+    lui-meme (hauteurs, y, coupes et replis exacts).
+
+    Les images intermediaires portent deja les r_* et t_* d'ARRIVEE : le
+    chevron et le style du panneau changent au premier instant, seules les
+    hauteurs glissent. Au repli, la liste disparait tout de suite et le
+    cadre vide se referme ; au depli, le cadre s'ouvre et la liste apparait
+    des qu'il atteint seuil_corps (voir le widget panel dans eww.yuck)."""
+    marge = res["y"][0]
+    t0 = time.monotonic()
+    for k, h in enumerate(images(depart, res["h"])[:-1], start=1):
+        pousser(dict(res, h=h, y=positions(h, marge)))
+        attente = t0 + ANIM_DUREE * k / ANIM_IMAGES - time.monotonic()
+        if attente > 0:
+            time.sleep(attente)
+    pousser(res)
+
+
 def mettre_a_jour(basculer=None):
     """--pousser (basculer=None) et --basculer <var> : relit tout, bascule
     eventuellement un panneau, recalcule, pousse.
@@ -528,6 +614,10 @@ def mettre_a_jour(basculer=None):
     (deux clics rapides replient puis deplient, sans s'annuler au hasard)."""
     with open(os.path.join(CACHE, "mise-en-page.lock"), "w") as verrou:
         fcntl.flock(verrou, fcntl.LOCK_EX)
+        # Point de depart de l'animation : les hauteurs a l'ecran AVANT le
+        # clic. Seulement pour un clic : les arrivees de donnees (nouveau
+        # mail...) restent instantanees.
+        depart = hauteurs_affichees() if basculer else None
         replies = lire_replies()
         if basculer:
             replies ^= {basculer}          # ^ = ajoute s'il manque, retire sinon
@@ -541,7 +631,10 @@ def mettre_a_jour(basculer=None):
             fermer_modale()
         h_col, largeur, marge, _ = geometrie()
         res = calculer(lire_tout_le_bus(), REELLES, h_col, largeur, marge, replies)
-        pousser(res)
+        if depart and depart != res["h"]:
+            animer(depart, res)
+        else:
+            pousser(res)
         print(" ".join(affectations(res)))      # -> mise-en-page.log
 
 
@@ -740,6 +833,44 @@ def test():
     for nom, bon in verifs:
         ok &= bon
         print(f"  {nom:40}{'OK' if bon else 'ÉCHEC'}")
+
+    print(f"\n6) Animation : {ANIM_IMAGES} images, constantes réelles, écran 1080,")
+    print("   chaque clic possible (toute combinaison de repliés, tout panneau)\n")
+    A = 1040 - BANDEAU - len(PANNEAUX) * ECART
+    n = 0
+    for compteurs in ({}, dict(recos=3, venir=7, mails=9, veille=4),
+                      dict(recos=5, venir=12, mails=20, veille=8)):
+        donnees = factices(**compteurs)
+        for rep in combinaisons:
+            depart = calculer(donnees, REELLES, 1040, 633, 20, rep)["h"]
+            for var in VARS:
+                apres = rep ^ {var}
+                arrivee = calculer(donnees, REELLES, 1040, 633, 20, apres)["h"]
+                suite = images(depart, arrivee)
+                n += 1
+                erreurs = []
+                if len(suite) != ANIM_IMAGES or suite[-1] != arrivee:
+                    erreurs.append("la dernière image n'est pas l'arrivée")
+                s0, s1 = sum(depart), sum(arrivee)
+                if s0 == s1 == A and any(sum(h) != A for h in suite):
+                    erreurs.append("une image ne fait pas A (le bandeau bougerait)")
+                if any(not min(s0, s1) <= sum(h) <= max(s0, s1) for h in suite):
+                    erreurs.append("total hors de l'intervalle départ-arrivée")
+                for i in range(len(PANNEAUX)):
+                    trajet = [depart[i]] + [h[i] for h in suite]
+                    monte = arrivee[i] >= depart[i]
+                    if any((b < a - 1) if monte else (b > a + 1)
+                           for a, b in zip(trajet, trajet[1:])):
+                        erreurs.append(f"{VARS[i]} fait demi-tour")
+                    if VARS[i] not in rep and VARS[i] not in apres \
+                            and min(trajet) < REELLES.plancher:
+                        erreurs.append(f"{VARS[i]} (ouvert) passe sous le plancher")
+                if erreurs:
+                    ok = False
+                    print(f"  ÉCHEC {compteurs} repliés={sorted(rep)} clic={var} : "
+                          f"{', '.join(erreurs)}")
+    print(f"  {n} clics : dernière image = arrivée exacte, total constant (bandeau")
+    print("  fixe), aucun panneau ne fait demi-tour, aucun ouvert sous le plancher.")
     print("\nRÉSULTAT :", "tout est OK" if ok else "ÉCHEC")
     return ok
 

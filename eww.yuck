@@ -22,7 +22,7 @@
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
 ;;   - variables digest recos venir veille  -> sync.sh
-;;   - variables h_* y_* t_* r_*            -> mise-en-page.py
+;;   - variables h_* y_* t_* r_* seuil_corps -> mise-en-page.py
 ;;   - variables mail_modale veille_modale  -> ui.sh, mise-en-page.py
 ;;   - variables y_mail y_veille            -> ui.sh
 ;;   - fenetre colonne                      -> ouvrir-colonne.sh
@@ -63,6 +63,12 @@
 (defvar r_venir false)
 (defvar r_mail false)
 (defvar r_veille false)
+;; seuil_corps = hauteur minimale (px) pour qu'un panneau ouvert affiche son
+;; corps sans deborder (le plancher de mise-en-page.py, pousse par lui).
+;; Sert pendant l'animation d'un depli : le panneau passe par des hauteurs
+;; trop petites pour sa liste, qui n'apparait qu'une fois le seuil atteint.
+;; 0 avant le premier calcul : rien n'est masque au demarrage.
+(defvar seuil_corps 0)
 
 ;; --- Panneau principal : en-tete (chevron, titre, resume, bouton ↻), puis
 ;;     le corps (separateur + zone de defilement) ------------------------
@@ -136,13 +142,16 @@
       ;; panneau replie (HAUTEUR_ENTETE) : ne pas le masquer au repli.
       (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
               :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
-    ;; Corps : separateur + liste, masques quand le panneau est replie.
-    (box :class "sep" :visible {!replie})
+    ;; Corps : separateur + liste, masques quand le panneau est replie, ET
+    ;; tant qu'il est plus petit que seuil_corps : pendant l'animation d'un
+    ;; depli, la liste attend d'avoir la place (sinon elle deborderait et
+    ;; pousserait le bandeau). Au repli, elle disparait des la 1re image.
+    (box :class "sep" :visible {!replie && hauteur >= seuil_corps})
     ;; overlay : le 1er enfant (le scroll) donne la taille, les suivants
     ;; sont poses PAR-DESSUS. Le scroll (vertical seulement) absorbe le
     ;; contenu qui depasse ; les labels non wrappes ont :truncate true pour
     ;; ne pas elargir la fenetre.
-    (overlay :vexpand true :visible {!replie}
+    (overlay :vexpand true :visible {!replie && hauteur >= seuil_corps}
       (scroll :class "sections" :vscroll true :hscroll false :vexpand true
         (box :orientation "v" :space-evenly false
           (children)))
