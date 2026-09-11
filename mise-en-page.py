@@ -32,6 +32,8 @@ Usage :
                            clic sur l'en-tete du panneau (eww.yuck).
                            L'etat est garde dans ~/.cache/pai/replies.json :
                            il survit aux redemarrages d'eww et du PC.
+                           Replier la boite de reception ferme la modale
+                           mail si elle est ouverte.
   mise-en-page.py test     verifie l'algorithme sur le tableau de reference
                            du brief v9 (section 3), plus des invariants.
   mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 [--replies reco]
@@ -53,6 +55,7 @@ import textwrap
 from dataclasses import dataclass
 
 EWW = os.path.expanduser("~/.cargo/bin/eww")
+UI = os.path.expanduser("~/.config/eww/ui.sh")       # ouvre / ferme la modale
 CACHE = os.path.expanduser("~/.cache/eww")
 BUS = os.path.join(CACHE, "bus")          # rempli par publier.sh
 # Etat de repli : une PREFERENCE d'affichage, gardee sur disque pour
@@ -304,15 +307,19 @@ class Panneau:
     besoin: object    # fonction (donnees, constantes, largeur) -> px
     decor_fin: int    # decoration sans texte sous le dernier element : on
                       # peut la rogner sans que le panneau soit "tronque"
+    modale: bool = False   # ses lignes ouvrent la modale (ui.sh) : le
+                           # replier la ferme (voir fermer_modale)
 
 
 PANNEAUX = (
     Panneau("reco", "Recommandations", "recos", besoin_recos,
             8 + BORDURE),     # $reco-pad-bas + trait
     Panneau("venir", "À venir", "venir", besoin_venir, LIGNE_PAD),
-    Panneau("mail", "Boîte de réception", "digest", besoin_mails, LIGNE_PAD),
+    Panneau("mail", "Boîte de réception", "digest", besoin_mails, LIGNE_PAD,
+            modale=True),
 )
 VARS = tuple(p.var for p in PANNEAUX)
+PAR_NOM = {p.var: p for p in PANNEAUX}
 
 
 def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset()):
@@ -457,6 +464,35 @@ def pousser(res):
                    env=ENV_EWW)
 
 
+def fermer_modale():
+    """Ferme la modale mail si elle est ouverte (etape 4 du repli).
+
+    Pourquoi la fermer : la modale fige son y a l'ouverture (ui.sh, bord
+    haut aligne sur le panneau mails). Si ce panneau se replie, elle
+    resterait accrochee dans le vide, a cote d'un simple en-tete. La fermer
+    est plus simple et plus sur que la deplacer.
+
+    On passe par "ui.sh close", le seul endroit qui sait la fermer
+    proprement : la fenetre ET la variable mail_modale (qui marque la ligne
+    choisie). Et seulement si elle est ouverte : "eww close" est justement
+    le genre d'appel sur lequel eww peut se bloquer (bug #451), inutile
+    d'en lancer un pour rien. Delais courts (1 + 1 + 2 s) : le tout doit
+    tenir dans le :timeout "5s" du clic. Demon bloque : on abandonne ;
+    eww-watchdog.sh relancera eww, et ouvrir-colonne.sh ferme alors la
+    modale de toute facon."""
+    try:
+        fenetres = subprocess.run([EWW, "active-windows"], capture_output=True,
+                                  text=True, timeout=1, env=ENV_EWW).stdout
+        choisi = subprocess.run([EWW, "get", "mail_modale"], capture_output=True,
+                                text=True, timeout=1, env=ENV_EWW).stdout.strip()
+        if re.search(r"^modale:", fenetres, re.M) or choisi:
+            subprocess.run(["bash", UI, "close"], timeout=2, check=False, env=ENV_EWW,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("modale fermée (panneau d'origine replié)")    # -> mise-en-page.log
+    except subprocess.TimeoutExpired:
+        print("eww ne répond pas : modale non fermée", file=sys.stderr)
+
+
 def mettre_a_jour(basculer=None):
     """--pousser (basculer=None) et --basculer <var> : relit tout, bascule
     eventuellement un panneau, recalcule, pousse.
@@ -475,6 +511,11 @@ def mettre_a_jour(basculer=None):
             # Ecrit AVANT de pousser : si eww ne repond pas, l'etat est quand
             # meme garde, et le prochain calcul l'appliquera.
             ecrire_replies(replies)
+            # On vient de REPLIER le panneau d'ou vient la modale : la fermer
+            # AVANT de changer les hauteurs, pour qu'elle ne reste pas un
+            # instant a cote d'un panneau qui n'a plus de liste.
+            if basculer in replies and PAR_NOM[basculer].modale:
+                fermer_modale()
         h_col, largeur, marge, _ = geometrie()
         res = calculer(lire_tout_le_bus(), REELLES, h_col, largeur, marge, replies)
         pousser(res)

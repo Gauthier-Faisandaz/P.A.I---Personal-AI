@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # ui.sh - ouvre / ferme la modale d'un mail.
 #   ui.sh open <mail_id>   clic sur une ligne de la boite de reception
-#   ui.sh close            croix ✕ de la modale
+#   ui.sh close            croix ✕ de la modale ; aussi lance par
+#                          mise-en-page.py quand on replie la boite de
+#                          reception (la modale resterait sinon accrochee
+#                          a cote d'un en-tete)
 #
 # Repris de la version d'avant l'accordeon (commit 8c5b890, fenetre
 # "detail"). Seule la GEOMETRIE change : la modale n'a plus une position

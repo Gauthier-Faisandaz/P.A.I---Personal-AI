@@ -440,7 +440,9 @@
 ;;             le haut si la modale depasserait le bas de l'ecran
 ;;   hauteur = 420px, propre a la modale
 ;; Un argument est fige a l'ouverture : si les panneaux changent de hauteur
-;; pendant que la modale est ouverte, elle ne bouge pas.
+;; pendant que la modale est ouverte, elle ne bouge pas. Exception : replier
+;; la boite de reception la FERME (mise-en-page.py, fermer_modale), sinon
+;; elle resterait accrochee a cote d'un simple en-tete.
 (defwindow modale [x y hauteur]
   :monitor 0
   :geometry (geometry :x x :y y :width "30%" :height hauteur :anchor "top right")
