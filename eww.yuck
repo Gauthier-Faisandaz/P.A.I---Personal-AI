@@ -82,40 +82,45 @@
 (defwidget panel [title sync source resume hauteur tronque panneau replie]
   (box :class "panel ${replie ? 'replie' : ''}" :orientation "v" :space-evenly false
        :vexpand {hauteur == 0} :height hauteur
-    ;; En-tete CLIQUABLE (eventbox) : replie / deplie le panneau.
-    ;; mise-en-page.py --basculer relit l'etat, bascule CE panneau,
-    ;; recalcule toutes les hauteurs et pousse le tout en un seul update.
-    ;; :timeout "5s" : eww TUE une commande onclick au bout de 200ms par
-    ;; defaut (voir le bouton ↻) ; le calcul prend ~0.1s, marge confortable.
-    ;; Le bouton ↻ reste dans l'en-tete : un clic dessus est pris par le
-    ;; bouton (GTK), il synchronise sans replier.
-    (eventbox :class "entete-clic" :cursor "pointer" :timeout "5s"
-              :tooltip {replie ? "déplier" : "replier (donne la place aux autres)"}
-              :onclick "python3 ~/.config/eww/mise-en-page.py --basculer ${panneau} > ~/.cache/eww/mise-en-page.log 2>&1"
-      (box :class "header" :orientation "h" :space-evenly false
-        ;; Chevron de repli, a gauche du titre : ▾ ouvert, ▸ replie.
-        (label :class "chevron" :text {replie ? "▸" : "▾"})
-        (label :class "title" :halign "start" :hexpand true :text title)
-        ;; Le compteur reste affiche une fois replie : on perd la liste,
-        ;; jamais l'information qu'il y a quelque chose.
-        (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
-        ;; Chevron de coupe, colle au compteur : "il y en a plus que ce qui
-        ;; se voit". Le degrade en bas du corps dit OU ca continue. Jamais
-        ;; sur un panneau replie (le script met alors t_* a false).
-        (label :class "coupe" :visible tronque :text "▼"
-               :tooltip "la liste continue : faire défiler")
-        ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
-        ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
-        ;; de la colonne.
-        ;; :timeout "15s" : eww TUE une commande onclick au bout de son
-        ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
-        ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
-        ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
-        ;; d'avoir mis a jour le panneau.
-        ;; Il fixe aussi la hauteur de l'en-tete (29px), donc celle d'un
-        ;; panneau replie (HAUTEUR_ENTETE) : ne pas le masquer au repli.
-        (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
-                :onclick "bash ~/.config/eww/sync.sh ${source}" "↻")))
+    ;; En-tete : DEUX zones cote a cote, la zone cliquable et le bouton ↻.
+    ;; Le bouton est volontairement HORS de l'eventbox : a l'interieur, un
+    ;; clic sur ↻ remontait aussi jusqu'a l'eventbox et repliait le panneau
+    ;; en plus de le synchroniser (constate a l'essai). Cote a cote, aucun
+    ;; des deux ne contient l'autre : un clic ne peut en toucher qu'un.
+    (box :class "header" :orientation "h" :space-evenly false
+      ;; Zone CLIQUABLE (eventbox) : tout l'en-tete sauf ↻. Replie /
+      ;; deplie le panneau. mise-en-page.py --basculer relit l'etat,
+      ;; bascule CE panneau, recalcule toutes les hauteurs et pousse le tout
+      ;; en un seul update.
+      ;; :timeout "5s" : eww TUE une commande onclick au bout de 200ms par
+      ;; defaut (voir le bouton ↻) ; le calcul prend ~0.1s, marge confortable.
+      (eventbox :class "entete-clic" :hexpand true :cursor "pointer" :timeout "5s"
+                :tooltip {replie ? "déplier" : "replier (donne la place aux autres)"}
+                :onclick "python3 ~/.config/eww/mise-en-page.py --basculer ${panneau} > ~/.cache/eww/mise-en-page.log 2>&1"
+        (box :orientation "h" :space-evenly false
+          ;; Chevron de repli, a gauche du titre : ▾ ouvert, ▸ replie.
+          (label :class "chevron" :text {replie ? "▸" : "▾"})
+          (label :class "title" :halign "start" :hexpand true :text title)
+          ;; Le compteur reste affiche une fois replie : on perd la liste,
+          ;; jamais l'information qu'il y a quelque chose.
+          (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
+          ;; Chevron de coupe, colle au compteur : "il y en a plus que ce
+          ;; qui se voit". Le degrade en bas du corps dit OU ca continue.
+          ;; Jamais sur un panneau replie (le script met alors t_* a false).
+          (label :class "coupe" :visible tronque :text "▼"
+                 :tooltip "la liste continue : faire défiler")))
+      ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
+      ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
+      ;; de la colonne.
+      ;; :timeout "15s" : eww TUE une commande onclick au bout de son
+      ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
+      ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
+      ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
+      ;; d'avoir mis a jour le panneau.
+      ;; Il fixe aussi la hauteur de l'en-tete (29px), donc celle d'un
+      ;; panneau replie (HAUTEUR_ENTETE) : ne pas le masquer au repli.
+      (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
+              :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
     ;; Corps : separateur + liste, masques quand le panneau est replie.
     (box :class "sep" :visible {!replie})
     ;; overlay : le 1er enfant (le scroll) donne la taille, les suivants

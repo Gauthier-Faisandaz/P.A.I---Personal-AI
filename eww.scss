@@ -42,9 +42,12 @@ $reco-puce-marge:     8px;   /* pastille -> titre (joue sur la largeur) */
 $reco-detail-retrait: 18px;  /* retrait du detail (joue sur la largeur) */
 $bandeau-haut:        38px;  /* + 2 x $bordure                          */
 
-/* Panneau replie : texte gris-vert au lieu du blanc, voile plus leger. */
-$texte-replie:        #b0c4b6;
+/* Panneau replie : voile plus leger. Le texte reste dans le meme blanc
+   qu'un panneau ouvert (choix utilisateur 11/09 : pas de gris-vert). */
 $fond-replie:         rgba(255, 255, 255, 0.05);
+/* Survol d'un en-tete cliquable : le chevron passe au jaune dore
+   (choix utilisateur 11/09). */
+$accent-entete:       #f5c542;
 
 
 * { all: unset; }
@@ -67,26 +70,20 @@ window { background-color: transparent; }
 .title  { font-weight: bold; }
 
 /* chevron de repli, a gauche du titre (triangle bas = ouvert, triangle
-   droite = replie). Au survol de l'en-tete, il prend l'accent du bouton de
-   synchro : c'est le signe que l'en-tete se clique. */
+   droite = replie). Au survol de la zone cliquable de l'en-tete, il passe
+   au jaune dore : c'est le signe que l'en-tete se clique. */
 .chevron { margin-right: 8px; color: rgba(255, 255, 255, 0.75); }
-.entete-clic:hover .chevron { color: #8ecae6; }
+.entete-clic:hover .chevron { color: $accent-entete; }
 
 /* resume a droite de l'en-tete ("8 a traiter"...) */
 .resume { font-size: 13px; color: rgba(255, 255, 255, 0.75); margin-left: 12px; }
 
-/* --- Panneau replie : en-tete seul, attenue ---------------------------- */
+/* --- Panneau replie : en-tete seul, voile plus leger ------------------- */
 /* Pas de marge sous l'en-tete : il n'y a plus rien dessous, et le panneau
    doit faire exactement HAUTEUR_ENTETE (59px, voir les constantes). Le
-   compteur reste lisible : gris-vert, pas plus sombre. */
+   texte ne change pas : meme blanc qu'un panneau ouvert. */
 .panel.replie { background-color: $fond-replie; }
 .panel.replie .header { margin-bottom: 0; }
-.panel.replie .title,
-.panel.replie .resume,
-.panel.replie .chevron,
-.panel.replie .sync-icon { color: $texte-replie; }
-.panel.replie .sync-icon:hover,
-.panel.replie .entete-clic:hover .chevron { color: #8ecae6; }
 
 /* infobulle du bouton de synchro ("sync hh:mm") : "* { all: unset; }" la
    rendrait transparente et illisible sur le fond d'ecran */
