@@ -32,7 +32,8 @@ $police-puce:         12px;  /* pastille de priorite d'une reco         */
 $police-sync:         24px;  /* bouton de synchro : fixe la hauteur de
                                 l'en-tete (29px)                        */
 $bordure:             1px;
-$panneau-pad-v:       14px;  /* haut et bas d'un panneau                */
+$panneau-pad-v:       14px;  /* haut d'un panneau ; en bas, la zone du
+                                halo (.coupe-zone), meme hauteur        */
 $panneau-pad-h:       18px;  /* gauche et droite                        */
 $entete-marge:        4px;   /* sous l'en-tete (panneau ouvert)         */
 $sep-haut:            6px;   /* separateur = 1px + ces deux marges      */
@@ -64,11 +65,16 @@ window { background-color: transparent; }
 .panel {
   background-color: rgba(255, 255, 255, 0.1);
   border: $bordure solid rgba(255, 255, 255, 0.25);
-  padding: $panneau-pad-v $panneau-pad-h;
+  /* pas de padding en BAS : la zone du halo (.coupe-zone, meme hauteur)
+     en tient lieu -- voir "Panneau tronque", plus bas */
+  padding: $panneau-pad-v $panneau-pad-h 0 $panneau-pad-h;
   color: white;
   font-family: "DejaVu Sans Mono", monospace;
   font-size: $police;
 }
+/* La modale reutilise .panel (classe "panel side") mais n'a pas de zone de
+   halo : elle garde son padding bas. */
+.panel.side { padding-bottom: $panneau-pad-v; }
 
 .header { margin-bottom: $entete-marge; }
 .title  { font-weight: bold; }
@@ -245,15 +251,26 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 .veille-vide { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 
 /* --- Panneau tronque : sa liste continue sous le bord ------------------- */
-/* Degrade pose par-dessus le bas de la liste (widget overlay, eww.yuck) :
-   le texte s'estompe au lieu d'etre coupe net. Hauteur : :height 20 dans
-   eww.yuck (pose par-dessus : ne compte pas dans la mise en page). */
-/* Blanc (retour utilisateur 11/09 : le noir tranchait avec le verre) : le
-   bas de la liste se fond dans un voile blanc, comme le fond des panneaux. */
-.coupe-degrade {
-  background-image: linear-gradient(to bottom,
-                                    rgba(255, 255, 255, 0),
-                                    rgba(255, 255, 255, 0.35));
+/* .coupe-zone = la marge interne SOUS la liste (derniere box du widget
+   panel, eww.yuck). Elle remplace le padding bas de .panel : meme hauteur
+   ($panneau-pad-v), donc mise-en-page.py ne change pas.
+   .coupe-halo (liste tronquee) : un halo blanc BOMBE dans cette marge,
+   sous la liste, sans jamais couvrir de texte (retour utilisateur 11/09 :
+   l'ancien degrade rectangulaire, pose par-dessus les dernieres lignes,
+   etait moche). Demi-ellipse centree sur le bord haut de la zone (juste
+   sous la derniere ligne visible), aussi large que la liste et aussi haute
+   que la zone : une forme en dome, plus lumineuse au centre. Plusieurs
+   paliers de transparence donnent un fondu doux jusqu'aux bords, sans
+   limite nette. Blanc, comme le voile des panneaux (retour utilisateur
+   11/09 : le noir tranchait avec le verre). */
+.coupe-zone { min-height: $panneau-pad-v; }
+.coupe-halo {
+  background-image: radial-gradient(ellipse farthest-side at 50% 0%,
+                                    rgba(255, 255, 255, 0.45) 0%,
+                                    rgba(255, 255, 255, 0.30) 25%,
+                                    rgba(255, 255, 255, 0.15) 50%,
+                                    rgba(255, 255, 255, 0.05) 75%,
+                                    rgba(255, 255, 255, 0) 100%);
 }
 /* chevron colle au compteur de l'en-tete. Blanc plein et triangle entier :
    en bleu clair 13px (premiere version), il disparaissait sur le fond

@@ -80,7 +80,7 @@
 ;; resume  = texte court affiche a droite de l'en-tete ("8 à traiter"...),
 ;;           pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
 ;; hauteur = hauteur TOTALE du panneau en px, bordures comprises (h_reco...)
-;; tronque = t_reco... : affiche le chevron et le degrade de coupe.
+;; tronque = t_reco... : affiche le chevron et le halo de coupe.
 ;; panneau = nom du panneau pour mise-en-page.py (reco | venir | mail | veille)
 ;; replie  = r_reco... : en-tete seul, corps masque.
 ;;
@@ -126,7 +126,7 @@
           ;; jamais l'information qu'il y a quelque chose.
           (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
           ;; Chevron de coupe, colle au compteur : "il y en a plus que ce
-          ;; qui se voit". Le degrade en bas du corps dit OU ca continue.
+          ;; qui se voit". Le halo sous la liste dit OU ca continue.
           ;; Jamais sur un panneau replie (le script met alors t_* a false).
           (label :class "coupe" :visible tronque :text "▼"
                  :tooltip "la liste continue : faire défiler")))
@@ -147,21 +147,21 @@
     ;; depli, la liste attend d'avoir la place (sinon elle deborderait et
     ;; pousserait le bandeau). Au repli, elle disparait des la 1re image.
     (box :class "sep" :visible {!replie && hauteur >= seuil_corps})
-    ;; overlay : le 1er enfant (le scroll) donne la taille, les suivants
-    ;; sont poses PAR-DESSUS. Le scroll (vertical seulement) absorbe le
-    ;; contenu qui depasse ; les labels non wrappes ont :truncate true pour
-    ;; ne pas elargir la fenetre.
-    (overlay :vexpand true :visible {!replie && hauteur >= seuil_corps}
-      (scroll :class "sections" :vscroll true :hscroll false :vexpand true
-        (box :orientation "v" :space-evenly false
-          (children)))
-      ;; Degrade de coupe, cale en bas (:valign "end"). C'est un simple box :
-      ;; sans fenetre GDK a lui, il laisse passer la molette jusqu'au scroll
-      ;; en dessous. Limite : eww ne connait pas la position de defilement,
-      ;; le degrade reste donc visible meme une fois arrive en bas.
-      ;; 20px : environ une ligne. Plus haut, il griserait toute la zone
-      ;; visible d'un panneau reduit a son plancher (une seule ligne).
-      (box :class "coupe-degrade" :valign "end" :height 20 :visible tronque))))
+    ;; Le scroll (vertical seulement) absorbe le contenu qui depasse ; les
+    ;; labels non wrappes ont :truncate true pour ne pas elargir la fenetre.
+    (scroll :class "sections" :vscroll true :hscroll false :vexpand true
+            :visible {!replie && hauteur >= seuil_corps}
+      (box :orientation "v" :space-evenly false
+        (children)))
+    ;; Zone du bas = la marge interne SOUS la liste. Elle REMPLACE le
+    ;; padding bas du panneau (mis a 0 dans eww.scss) : meme hauteur
+    ;; ($panneau-pad-v), donc aucun calcul ne change -- repli compris : elle
+    ;; reste visible quand le panneau est replie. Liste tronquee : elle
+    ;; porte le halo de coupe, SOUS la liste, sans jamais couvrir de texte
+    ;; (avant, un degrade rectangulaire etait pose PAR-DESSUS les dernieres
+    ;; lignes : retour utilisateur 11/09). Limite inchangee : eww ne connait
+    ;; pas la position de defilement, le halo reste visible meme arrive en bas.
+    (box :class "coupe-zone ${tronque ? 'coupe-halo' : ''}")))
 
 
 ;; ==========================================================================

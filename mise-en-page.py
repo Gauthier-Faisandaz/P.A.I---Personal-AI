@@ -92,7 +92,8 @@ CHASSE_13 = 8
 CHASSE_12 = 7
 
 BORDURE = 1            # $bordure
-PANNEAU_PAD_V = 14     # $panneau-pad-v (haut ET bas)
+PANNEAU_PAD_V = 14     # $panneau-pad-v (haut ; en bas, la zone du halo
+                       # de coupe .coupe-zone, meme hauteur)
 PANNEAU_PAD_H = 18     # $panneau-pad-h (gauche ET droite)
 ENTETE = LIGNE_24 + 4                 # bouton ↻ + $entete-marge
 SEPARATEUR = 6 + 1 + 12               # $sep-haut + trait + $sep-bas
