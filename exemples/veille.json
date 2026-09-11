@@ -1,0 +1,29 @@
+{
+  "synchro": "10:29",
+  "items": [
+    { "titre": "Comparatif des orchestrateurs de workflows open source",
+      "source": "newsletter",
+      "age": "3 h",
+      "neuf": true,
+      "url": "https://example.com/veille/orchestrateurs",
+      "pourquoi": "Recoupe directement ta pile n8n." },
+    { "titre": "Retour d'expérience : un tableau de bord personnel sous Linux",
+      "source": "blog",
+      "age": "1 j",
+      "neuf": true,
+      "url": "https://example.com/veille/tableau-de-bord",
+      "pourquoi": "Même approche que ta colonne eww : utile pour comparer les choix de mise en page." },
+    { "titre": "Trier ses mails avec un modèle de langage : les pièges courants",
+      "source": "article",
+      "age": "2 j",
+      "neuf": false,
+      "url": "https://example.com/veille/tri-mails",
+      "pourquoi": "Ton workflow digest-mail fait exactement ce tri." },
+    { "titre": "Taskwarrior : que faire des tâches sans date ?",
+      "source": "forum",
+      "age": "4 j",
+      "neuf": false,
+      "url": "https://example.com/veille/taskwarrior",
+      "pourquoi": "Ton compteur « en vrac » du bandeau vient de là." }
+  ]
+}

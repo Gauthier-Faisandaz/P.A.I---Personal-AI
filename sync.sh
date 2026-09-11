@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Synchronisation manuelle : relance la recuperation et rafraichit les boites.
-# Usage :  sync.sh [digest|recos|venir|all]      (defaut : all)
+# Usage :  sync.sh [digest|recos|venir|veille|all]      (defaut : all)
 EWW="$HOME/.cargo/bin/eww"
 CFG="$HOME/.config/eww"
 what="${1:-all}"
@@ -13,4 +13,7 @@ case "$what" in
 esac
 case "$what" in
   venir|all)  "$EWW" update venir="$(bash "$CFG/fetch-venir.sh")" ;;
+esac
+case "$what" in
+  veille|all) "$EWW" update veille="$(bash "$CFG/fetch-veille.sh")" ;;
 esac

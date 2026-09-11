@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 mise-en-page.py - calcule la hauteur de chaque panneau de la colonne eww
-(recommandations, a venir, boite de reception) et la position verticale
-(y) de leur bord haut.
+(recommandations, a venir, boite de reception, veille) et la position
+verticale (y) de leur bord haut.
 
 Un panneau peut etre REPLIE (clic sur son en-tete) : il ne garde que son
 en-tete (HAUTEUR_ENTETE) et sort du partage ; les panneaux ouverts se
@@ -20,7 +20,7 @@ Usage :
                            actuel, affiche le resultat, sans rien envoyer.
   mise-en-page.py --replies reco,venir
                            meme chose, en supposant CES panneaux replies
-                           (noms : reco, venir, mail ; "" = aucun).
+                           (noms : reco, venir, mail, veille ; "" = aucun).
   mise-en-page.py --pousser
                            meme calcul, puis envoie a eww les hauteurs
                            (h_*), les positions (y_*), les indicateurs de
@@ -34,9 +34,9 @@ Usage :
                            il survit aux redemarrages d'eww et du PC.
                            Replier ou deplier un panneau, quel qu'il soit,
                            ferme la modale si elle est ouverte.
-  mise-en-page.py test     verifie l'algorithme sur le tableau de reference
-                           du brief v9 (section 3), plus des invariants.
-  mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 [--replies reco]
+  mise-en-page.py test     verifie l'algorithme sur les tableaux de reference
+                           du brief v9 (sections 3 et 5), plus des invariants.
+  mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 --veille 5 [--replies reco]
                            meme calcul sur des donnees inventees.
 """
 import argparse
@@ -44,6 +44,7 @@ import contextlib
 import dataclasses
 import fcntl
 import io
+import itertools
 import json
 import math
 import os
@@ -129,6 +130,7 @@ class Constantes:
     ligne_mail: int          # sujet + ligne "expediteur · age"
     ligne_mail_sans_meta: int
     ligne_venir: int
+    ligne_veille: int        # une ligne de veille (un seul niveau)
     reco_base: int           # reco avec un titre d'UNE ligne, sans detail
     reco_ligne_titre: int    # chaque ligne de titre en plus
     reco_ligne_detail: int   # chaque ligne de detail
@@ -153,6 +155,9 @@ REELLES = Constantes(
     ligne_mail=2 * LIGNE_PAD + LIGNE_15 + LIGNE_12,     # 37
     ligne_mail_sans_meta=2 * LIGNE_PAD + LIGNE_15,      # 22
     ligne_venir=2 * LIGNE_PAD + LIGNE_15,               # 22
+    # Ligne de veille : titre en $police sur UNE ligne, "source · age" en
+    # 13px a droite (17px, tient dedans). Reporte dans eww.scss.
+    ligne_veille=2 * LIGNE_PAD + LIGNE_15,              # 22
     reco_base=LIGNE_15 + RECO_TETE_MARGE + RECO_BAS,    # 41
     reco_ligne_titre=LIGNE_15,
     reco_ligne_detail=LIGNE_13,
@@ -163,18 +168,19 @@ REELLES = Constantes(
 # Brief precedent (v8, section 4) : en-tete 34 + padding 16, ligne vide
 # 26... Ne sert plus qu'a un test de NON-REGRESSION : sans rien de replie,
 # l'algorithme doit donner exactement ce qu'il donnait avant le repli. Le
-# v8 ne repliait rien ; replie=34 est la valeur du v9.
+# v8 ne repliait rien et n'avait pas de veille ; replie=34 et
+# ligne_veille=26 sont les valeurs du v9.
 BRIEF_V8 = Constantes(
     habillage=34 + 16, ligne_vide=26, section_titre=22, mail_titre_section=22,
     section_marge=0, ligne_mail=26, ligne_mail_sans_meta=26, ligne_venir=24,
-    reco_base=40, reco_ligne_titre=18, reco_ligne_detail=17, reco_marge=0,
-    replie=34,
+    ligne_veille=26, reco_base=40, reco_ligne_titre=18, reco_ligne_detail=17,
+    reco_marge=0, replie=34,
 )
 
-# Brief actuel (v9, section 3) : memes briques, mais son tableau compte les
-# mails comme une liste PLATE, sans la ligne "► À TRAITER" (verifie par le
-# calcul : c'est la seule hypothese qui retombe sur ses valeurs). Le vrai
-# panneau, lui, affiche cette ligne : REELLES la compte.
+# Brief actuel (v9, sections 3 et 5) : memes briques, mais ses tableaux
+# comptent les mails comme une liste PLATE, sans la ligne "► À TRAITER"
+# (verifie par le calcul : c'est la seule hypothese qui retombe sur ses
+# valeurs). Le vrai panneau, lui, affiche cette ligne : REELLES la compte.
 BRIEF_V9 = dataclasses.replace(BRIEF_V8, mail_titre_section=0)
 
 
@@ -293,12 +299,21 @@ def besoin_mails(digest, c, largeur):
     return total - c.section_marge             # pas de marge sous la derniere
 
 
+def besoin_veille(veille, c, largeur):
+    # Liste plate, une ligne par item : pas de groupe, pas de marge.
+    items = veille.get("items") or []
+    if not items:
+        return c.habillage + c.ligne_vide      # "Rien de neuf."
+    return c.habillage + len(items) * c.ligne_veille
+
+
 # ==========================================================================
 #  LES PANNEAUX, de haut en bas
 # ==========================================================================
 # C'est ICI, et seulement ici, que le script apprend combien il y a de
-# panneaux : n = len(PANNEAUX). Ajouter un panneau (la veille, etape 5) =
-# une ligne de plus dans cette table (+ eww.yuck et publier.sh).
+# panneaux : n = len(PANNEAUX). La veille (etape 5) a ete ajoutee par UNE
+# ligne dans cette table (+ eww.yuck, publier.sh et sync.sh) : c'etait le
+# test que n est bien un parametre.
 @dataclass(frozen=True)
 class Panneau:
     var: str          # suffixe des variables eww : h_ y_ t_ r_<var>
@@ -314,20 +329,25 @@ PANNEAUX = (
             8 + BORDURE),     # $reco-pad-bas + trait
     Panneau("venir", "À venir", "venir", besoin_venir, LIGNE_PAD),
     Panneau("mail", "Boîte de réception", "digest", besoin_mails, LIGNE_PAD),
+    # En DERNIER, juste au-dessus du bandeau : c'est la seule chose sans
+    # echeance de la colonne (agir -> engage -> repondre -> lire).
+    Panneau("veille", "Veille", "veille", besoin_veille, LIGNE_PAD),
 )
 VARS = tuple(p.var for p in PANNEAUX)
 
 
-def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset()):
+def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset(),
+             panneaux=PANNEAUX):
     """Tout le calcul : besoins -> hauteurs -> positions y.
-    donnees = {nom du bus: JSON} ; replies = ensemble de noms de PANNEAUX
-    (VARS) replies."""
-    n = len(PANNEAUX)
+    donnees = {nom du bus: JSON} ; replies = ensemble de noms de panneaux
+    (VARS) replies ; panneaux = PANNEAUX, ou une autre liste pour rejouer un
+    tableau du brief (trois panneaux avant la veille)."""
+    n = len(panneaux)
     # n panneaux + le bandeau, separes par n ecarts (voir la fenetre
     # colonne dans eww.yuck).
     A = hauteur_colonne - BANDEAU - n * ECART
-    besoins = [p.besoin(donnees.get(p.bus) or {}, c, largeur) for p in PANNEAUX]
-    replie = [p.var in replies for p in PANNEAUX]
+    besoins = [p.besoin(donnees.get(p.bus) or {}, c, largeur) for p in panneaux]
+    replie = [p.var in replies for p in panneaux]
     h = repartir(A, besoins, c.plancher, replie, c.replie)
     # y[i] = marge + somme des (h[j] + ecart) pour j < i
     y, bord = [], marge
@@ -339,9 +359,9 @@ def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset()):
     # ne cache rien de lisible : pas de chevron ni de degrade pour ca. Un
     # panneau replie n'est jamais "tronque" : il n'a plus de liste.
     tronque = [not r and b - hi > p.decor_fin
-               for p, r, hi, b in zip(PANNEAUX, replie, h, besoins)]
+               for p, r, hi, b in zip(panneaux, replie, h, besoins)]
     return {"A": A, "besoin": besoins, "h": h, "y": y,
-            "tronque": tronque, "replie": replie}
+            "tronque": tronque, "replie": replie, "panneaux": panneaux}
 
 
 # ==========================================================================
@@ -427,7 +447,7 @@ def ecrire_replies(replies, chemin=REPLIES):
     os.replace(tmp, chemin)
 
 
-def factices(recos=0, venir=0, groupes=4, mails=0, sections=1):
+def factices(recos=0, venir=0, groupes=4, mails=0, sections=1, veille=0):
     """Donnees inventees au format des fetch-*.sh : titres courts (une
     ligne), mails avec leur ligne "expediteur · age"."""
     def decouper(n, paquets):
@@ -437,6 +457,7 @@ def factices(recos=0, venir=0, groupes=4, mails=0, sections=1):
         "recos": {"recommandations": [{"titre": f"Reco {k + 1}", "detail": ""} for k in range(recos)]},
         "venir": {"groupes": [{"items": [{}] * t} for t in decouper(venir, groupes)]},
         "digest": {"sections": [{"items": [{"meta": "x · 1 h"}] * t} for t in decouper(mails, sections)]},
+        "veille": {"items": [{"titre": f"Article {k + 1}"} for k in range(veille)]},
     }
 
 
@@ -444,11 +465,12 @@ def factices(recos=0, venir=0, groupes=4, mails=0, sections=1):
 #  SORTIES
 # ==========================================================================
 def affectations(res):
-    """["h_reco=128", ..., "r_mail=false"] : les variables pour eww."""
-    return ([f"h_{v}={x}" for v, x in zip(VARS, res["h"])] +
-            [f"y_{v}={x}" for v, x in zip(VARS, res["y"])] +
-            [f"t_{v}={'true' if t else 'false'}" for v, t in zip(VARS, res["tronque"])] +
-            [f"r_{v}={'true' if r else 'false'}" for v, r in zip(VARS, res["replie"])])
+    """["h_reco=128", ..., "r_veille=false"] : les variables pour eww."""
+    noms = [p.var for p in res["panneaux"]]
+    return ([f"h_{v}={x}" for v, x in zip(noms, res["h"])] +
+            [f"y_{v}={x}" for v, x in zip(noms, res["y"])] +
+            [f"t_{v}={'true' if t else 'false'}" for v, t in zip(noms, res["tronque"])] +
+            [f"r_{v}={'true' if r else 'false'}" for v, r in zip(noms, res["replie"])])
 
 
 def pousser(res):
@@ -471,18 +493,21 @@ def fermer_modale():
     simple et plus sur que la deplacer.
 
     On passe par "ui.sh close", le seul endroit qui sait la fermer
-    proprement : la fenetre ET la variable mail_modale (qui marque la ligne
-    choisie). Et seulement si elle est ouverte : "eww close" est justement
-    le genre d'appel sur lequel eww peut se bloquer (bug #451), inutile
-    d'en lancer un pour rien. Delais courts (1 + 1 + 2 s) : le tout doit
-    tenir dans le :timeout "5s" du clic. Demon bloque : on abandonne ;
-    eww-watchdog.sh relancera eww, et ouvrir-colonne.sh ferme alors la
-    modale de toute facon."""
+    proprement : la fenetre ET les variables mail_modale / veille_modale
+    (qui marquent la ligne choisie). Et seulement si elle est ouverte :
+    "eww close" est justement le genre d'appel sur lequel eww peut se
+    bloquer (bug #451), inutile d'en lancer un pour rien. Delais courts
+    (1 + 1 + 2 s) : le tout doit tenir dans le :timeout "5s" du clic. Demon
+    bloque : on abandonne ; eww-watchdog.sh relancera eww, et
+    ouvrir-colonne.sh ferme alors la modale de toute facon."""
     try:
         fenetres = subprocess.run([EWW, "active-windows"], capture_output=True,
                                   text=True, timeout=1, env=ENV_EWW).stdout
-        choisi = subprocess.run([EWW, "get", "mail_modale"], capture_output=True,
-                                text=True, timeout=1, env=ENV_EWW).stdout.strip()
+        # "eww state" donne en UN appel les variables affichees, dont
+        # mail_modale et veille_modale ("nom: valeur", valeur vide = aucun).
+        etat = subprocess.run([EWW, "state"], capture_output=True,
+                              text=True, timeout=1, env=ENV_EWW).stdout
+        choisi = re.search(r"^(mail|veille)_modale: *\S", etat, re.M)
         if re.search(r"^modale:", fenetres, re.M) or choisi:
             subprocess.run(["bash", UI, "close"], timeout=2, check=False, env=ENV_EWW,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -522,7 +547,7 @@ def mettre_a_jour(basculer=None):
 
 def afficher(res):
     print(f"{'':20}{'besoin':>8}{'hauteur':>9}{'%':>5}{'y':>6}")
-    for i, p in enumerate(PANNEAUX):
+    for i, p in enumerate(res["panneaux"]):
         if res["replie"][i]:
             etat = "  replié (en-tête seul)"
         elif res["tronque"][i]:
@@ -540,115 +565,148 @@ def afficher(res):
 # ==========================================================================
 #  TEST
 # ==========================================================================
+# Le brief ne connait pas la "decoration rognable" (decor_fin : padding et
+# trait sous le dernier element) : pour lui, un panneau est tronque des
+# qu'il lui manque 1 px. Ses tableaux se rejouent donc avec une tolerance
+# nulle.
+SANS_DECOR = tuple(dataclasses.replace(p, decor_fin=0) for p in PANNEAUX)
+
+
 def _cellule(h, tronque, replie):
-    """Une case au format du tableau du brief : "222", "194▾" ou "replié"."""
+    """Une case au format des tableaux du brief : "222", "194▾" ou "replié"."""
     return "replié" if replie else f"{h}{'▾' if tronque else ''}"
 
 
-def test():
-    """Critere d'acceptation de l'etape 1 : tableau v9 du brief a +-2 px
-    (hauteurs, replies et signes ▾), somme des hauteurs == A sauf si tout
-    est replie ; plus la non-regression v8 et des invariants."""
+def rejouer_tableau(cas, c, panneaux, A):
+    """Rejoue un tableau du brief. Chaque cas = (situation, compteurs,
+    replies, cases attendues). Critere : hauteurs a +-2 px, memes replies,
+    memes signes ▾, somme == A (sauf si tout est replie). Renvoie True si
+    tout concorde."""
     ok = True
-    h_col_917 = 917 + BANDEAU + len(PANNEAUX) * ECART   # colonne ou A = 917
+    h_col = A + BANDEAU + len(panneaux) * ECART       # colonne ou A tombe juste
+    larg = 9 * len(panneaux) + 3
+    print(f"{'situation':34}{'obtenu':>{larg}}{'attendu':>{larg}}   somme   verdict")
+    for nom, compteurs, replies, attendu in cas:
+        res = calculer(factices(**compteurs), c, h_col, 633, 26, frozenset(replies), panneaux)
+        obtenu = tuple(_cellule(*x) for x in zip(res["h"], res["tronque"], res["replie"]))
+        bon = True
+        for o, a, h in zip(obtenu, attendu, res["h"]):
+            if a == "replié":
+                bon &= o == "replié" and h == c.replie
+            else:
+                # meme signe ▾ (ou absence de signe), hauteur a +-2 px
+                bon &= o.endswith("▾") == a.endswith("▾") and o != "replié" \
+                       and abs(h - int(a.rstrip("▾"))) <= 2
+        somme = sum(res["h"])
+        attendue = A if any(not r for r in res["replie"]) else len(panneaux) * c.replie
+        bon &= somme == attendue
+        ok &= bon
+        print(f"{nom:34}{' / '.join(obtenu):>{larg}}{' / '.join(attendu):>{larg}}"
+              f"{somme:>8}   {'OK' if bon else 'ÉCHEC'}")
+    return ok
 
-    print("1) Tableau de référence du brief v9, section 3 (ses constantes, A = 917)")
-    print("   ▾ = tronqué ; mails comptés sans titre de section, comme le brief\n")
+
+def test():
+    """Criteres d'acceptation : tableaux v9 du brief (etape 1 : trois
+    panneaux ; etape 5 : quatre avec la veille) a +-2 px, somme des
+    hauteurs == A sauf si tout est replie ; plus la non-regression v8, des
+    invariants et le fichier d'etat."""
+    ok = True
     normale = dict(recos=3, venir=7, mails=9)
     chargee = dict(recos=5, venir=12, mails=20)
-    cas = [  # (situation, compteurs, replies, attendu au format du brief)
+
+    print("1) Brief v9, section 3 : trois panneaux (avant la veille), A = 917")
+    print("   ses constantes ; ▾ = tronqué ; mails comptés sans titre de section\n")
+    ok &= rejouer_tableau([
         ("Normale 3/7/9", normale, set(), ("222", "358", "336")),
         ("… reco replié", normale, {"reco"}, ("replié", "452", "430")),
         ("Chargée 5/12/20", chargee, set(), ("194▾", "313▾", "410▾")),
         ("… reco replié", chargee, {"reco"}, ("replié", "379▾", "504▾")),
         ("… tout replié sauf mails", chargee, {"reco", "venir"}, ("replié", "replié", "849")),
         # Pas dans le tableau du brief : le mode bureau calme (section 2).
-        ("Tout replié", normale, set(VARS), ("replié", "replié", "replié")),
-    ]
-    print(f"{'situation':28}{'obtenu':>28}{'attendu':>28}   somme   verdict")
-    for nom, compteurs, replies, attendu in cas:
-        res = calculer(factices(**compteurs), BRIEF_V9, h_col_917, 633, 26, frozenset(replies))
-        obtenu = tuple(_cellule(*x) for x in zip(res["h"], res["tronque"], res["replie"]))
-        bon = True
-        for o, a, h in zip(obtenu, attendu, res["h"]):
-            if a == "replié":
-                bon &= o == "replié" and h == BRIEF_V9.replie
-            else:
-                # meme signe ▾ (ou absence de signe), hauteur a +-2 px
-                bon &= o.endswith("▾") == a.endswith("▾") and o != "replié" \
-                       and abs(h - int(a.rstrip("▾"))) <= 2
-        somme = sum(res["h"])
-        attendue = 917 if any(not r for r in res["replie"]) else len(PANNEAUX) * BRIEF_V9.replie
-        bon &= somme == attendue
-        ok &= bon
-        print(f"{nom:28}{' / '.join(obtenu):>28}{' / '.join(attendu):>28}"
-              f"{somme:>8}   {'OK' if bon else 'ÉCHEC'}")
+        ("Tout replié", normale, set(VARS), ("replié",) * 3),
+    ], BRIEF_V9, SANS_DECOR[:3], 917)
 
-    print("\n2) Non-régression : rien de replié, constantes du brief v8, A = 917")
+    print("\n2) Brief v9, section 5 : quatre panneaux avec la veille, A = 904\n")
+    normale4 = dict(normale, veille=5)
+    ok &= rejouer_tableau([
+        # Critere de l'etape 5 : quatre panneaux vides -> A/4 chacun.
+        ("Tous vides (A/4)", {}, set(), ("226",) * 4),
+        ("Normale 3/7/9/5", normale4, set(), ("165▾", "293▾", "272▾", "174▾")),
+        ("Avec plafonds 3/7/7/4", dict(recos=3, venir=7, mails=7, veille=4), set(),
+         ("180", "316", "242", "164")),
+        ("Normale, « À venir » replié", normale4, {"venir"}, ("249", "replié", "363", "259")),
+        ("Normale, reco + veille repliés", normale4, {"reco", "veille"},
+         ("replié", "429", "407", "replié")),
+        ("Chargée, tout replié sauf mails", dict(chargee, veille=5), {"reco", "venir", "veille"},
+         ("replié", "replié", "802", "replié")),
+    ], BRIEF_V9, SANS_DECOR, 904)
+
+    print("\n3) Non-régression : trois panneaux, rien de replié, brief v8, A = 917")
     print("   (l'algorithme doit donner exactement ce qu'il donnait avant le repli)\n")
-    cas = [  # (situation, compteurs, valeurs obtenues avant cette etape)
+    cas = [  # (situation, compteurs, valeurs obtenues avant le repli)
         ("Tous vides", {}, (306, 306, 305)),
         ("Journée normale", dict(recos=3, venir=7, mails=9), (215, 351, 351)),
         ("Mails pleins, reste vide", dict(mails=25), (90, 90, 737)),
         ("Tous pleins", dict(recos=5, venir=14, mails=25), (174, 301, 442)),
     ]
-    print(f"{'situation':28}{'obtenu':>18}{'avant':>18}   verdict")
+    h_col_917 = 917 + BANDEAU + 3 * ECART
+    print(f"{'situation':34}{'obtenu':>18}{'avant':>18}   verdict")
     for nom, compteurs, avant in cas:
-        h = tuple(calculer(factices(**compteurs), BRIEF_V8, h_col_917, 633, 26)["h"])
+        h = tuple(calculer(factices(**compteurs), BRIEF_V8, h_col_917, 633, 26,
+                           panneaux=PANNEAUX[:3])["h"])
         bon = h == avant
         ok &= bon
-        print(f"{nom:28}{str(h):>18}{str(avant):>18}   {'OK' if bon else 'ÉCHEC'}")
+        print(f"{nom:34}{str(h):>18}{str(avant):>18}   {'OK' if bon else 'ÉCHEC'}")
 
-    print("\n3) Invariants, constantes réelles, écran 1080 et 768 (marge 20),")
-    print("   pour chacune des combinaisons de panneaux repliés")
+    print(f"\n4) Invariants, constantes réelles, {len(PANNEAUX)} panneaux, écran 1080 et 768")
+    print("   (marge 20), pour chacune des combinaisons de panneaux repliés")
     # Toutes les combinaisons de replies : {}, {reco}, {venir}, ... {tout}
     combinaisons = [frozenset(v for k, v in enumerate(VARS) if masque >> k & 1)
                     for masque in range(2 ** len(VARS))]
     n = 0
     for h_col in (1040, 728):
         A = h_col - BANDEAU - len(PANNEAUX) * ECART
-        for r in range(0, 13, 2):
-            for v in range(0, 31, 3):
-                for m in range(0, 41, 3):
-                    donnees = factices(recos=r, venir=v, mails=m)
-                    res = {rep: calculer(donnees, REELLES, h_col, 633, 20, rep)
-                           for rep in combinaisons}
-                    for rep, x in res.items():
-                        n += 1
-                        h, b = x["h"], x["besoin"]
-                        ouv = [i for i, p in enumerate(PANNEAUX) if p.var not in rep]
-                        A_o = A - REELLES.replie * (len(PANNEAUX) - len(ouv))
-                        erreurs = []
-                        if any(h[i] != REELLES.replie for i in range(len(h)) if i not in ouv):
-                            erreurs.append("un replié ne fait pas HAUTEUR_ENTETE")
-                        if any(t for i, t in enumerate(x["tronque"]) if i not in ouv):
-                            erreurs.append("un replié est marqué tronqué")
-                        if ouv and sum(h) != A:
-                            erreurs.append(f"somme {sum(h)} != A {A}")
-                        if not ouv and sum(h) != len(PANNEAUX) * REELLES.replie:
-                            erreurs.append("tout replié : somme != n x en-tête")
-                        if any(h[i] < REELLES.plancher for i in ouv):
-                            erreurs.append("un ouvert est sous le plancher")
-                        if sum(max(REELLES.plancher, b[i]) for i in ouv) <= A_o \
-                                and any(h[i] < b[i] for i in ouv):
-                            erreurs.append("tronqué alors que tout tient")
-                        if any(x["y"][i + 1] != x["y"][i] + h[i] + ECART for i in range(len(h) - 1)):
-                            erreurs.append("y incohérents")
-                        # Le repli DONNE de la place : replier un panneau de
-                        # plus ne retrecit aucun des autres (a 1 px
-                        # d'arrondi pres). Vrai tant que HAUTEUR_ENTETE <
-                        # plancher : le replie rend toujours plus qu'il ne
-                        # garde.
-                        for var in VARS:
-                            if var in rep:
-                                continue
-                            apres = res[rep | {var}]["h"]
-                            if any(apres[i] < h[i] - 1 for i in ouv if VARS[i] != var):
-                                erreurs.append(f"replier {var} rétrécit un autre panneau")
-                        if erreurs:
-                            ok = False
-                            print(f"  ÉCHEC r={r} v={v} m={m} h_col={h_col} "
-                                  f"repliés={sorted(rep)} : {', '.join(erreurs)}")
+        for r, v, m, w in itertools.product(range(0, 13, 3), range(0, 31, 5),
+                                            range(0, 41, 5), range(0, 21, 5)):
+            donnees = factices(recos=r, venir=v, mails=m, veille=w)
+            res = {rep: calculer(donnees, REELLES, h_col, 633, 20, rep)
+                   for rep in combinaisons}
+            for rep, x in res.items():
+                n += 1
+                h, b = x["h"], x["besoin"]
+                ouv = [i for i, p in enumerate(PANNEAUX) if p.var not in rep]
+                A_o = A - REELLES.replie * (len(PANNEAUX) - len(ouv))
+                erreurs = []
+                if any(h[i] != REELLES.replie for i in range(len(h)) if i not in ouv):
+                    erreurs.append("un replié ne fait pas HAUTEUR_ENTETE")
+                if any(t for i, t in enumerate(x["tronque"]) if i not in ouv):
+                    erreurs.append("un replié est marqué tronqué")
+                if ouv and sum(h) != A:
+                    erreurs.append(f"somme {sum(h)} != A {A}")
+                if not ouv and sum(h) != len(PANNEAUX) * REELLES.replie:
+                    erreurs.append("tout replié : somme != n x en-tête")
+                if any(h[i] < REELLES.plancher for i in ouv):
+                    erreurs.append("un ouvert est sous le plancher")
+                if sum(max(REELLES.plancher, b[i]) for i in ouv) <= A_o \
+                        and any(h[i] < b[i] for i in ouv):
+                    erreurs.append("tronqué alors que tout tient")
+                if any(x["y"][i + 1] != x["y"][i] + h[i] + ECART for i in range(len(h) - 1)):
+                    erreurs.append("y incohérents")
+                # Le repli DONNE de la place : replier un panneau de plus ne
+                # retrecit aucun des autres (a 1 px d'arrondi pres). Vrai
+                # tant que HAUTEUR_ENTETE < plancher : le replie rend
+                # toujours plus qu'il ne garde.
+                for var in VARS:
+                    if var in rep:
+                        continue
+                    apres = res[rep | {var}]["h"]
+                    if any(apres[i] < h[i] - 1 for i in ouv if VARS[i] != var):
+                        erreurs.append(f"replier {var} rétrécit un autre panneau")
+                if erreurs:
+                    ok = False
+                    print(f"  ÉCHEC r={r} v={v} m={m} w={w} h_col={h_col} "
+                          f"repliés={sorted(rep)} : {', '.join(erreurs)}")
     vides = calculer(factices(), REELLES, 1040, 633, 20)["h"]
     parts = max(vides) - min(vides) <= 1
     ok &= parts
@@ -657,7 +715,7 @@ def test():
     print("  tout tient, y cohérents, replier ne rétrécit jamais un autre panneau.")
     print(f"  Tous vides, écran 1080 : {vides} -> {'parts égales' if parts else 'ÉCHEC'}")
 
-    print("\n4) Fichier d'état des repliés (dans un dossier temporaire, jamais le vrai)\n")
+    print("\n5) Fichier d'état des repliés (dans un dossier temporaire, jamais le vrai)\n")
     with tempfile.TemporaryDirectory() as d:
         chemin = os.path.join(d, "pai", "replies.json")   # dossier pai absent : a creer
         verifs = [("fichier absent -> tout ouvert", lire_replies(chemin) == frozenset())]
@@ -705,6 +763,7 @@ def main():
     p.add_argument("--groupes", type=int, default=4, help="répartis en N groupes")
     p.add_argument("--mails", type=int, default=0)
     p.add_argument("--sections", type=int, default=1, help="mails répartis en N sections")
+    p.add_argument("--veille", type=int, default=0, help="nombre d'items de veille")
     p.add_argument("--replies", type=liste_replies, default=None,
                    help=f"panneaux supposés repliés, séparés par des virgules "
                         f"({', '.join(VARS)}) ; sans cette option : l'état actuel "
@@ -729,7 +788,7 @@ def main():
 
     h_col, largeur, marge, ecran = geometrie()
     if a.mode == "simuler":
-        donnees = factices(a.recos, a.venir, a.groupes, a.mails, a.sections)
+        donnees = factices(a.recos, a.venir, a.groupes, a.mails, a.sections, a.veille)
         replies = a.replies or frozenset()
         origine = "données simulées"
     else:

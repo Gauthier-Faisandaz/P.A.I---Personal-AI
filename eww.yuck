@@ -1,5 +1,5 @@
 ;; ~/.config/eww/eww.yuck - Viridis Lab : colonne (recommandations, a venir,
-;;                          boite de reception) + bandeau (verre)
+;;                          boite de reception, veille) + bandeau (verre)
 ;; Demarrage :  voir start.sh (ouvre toutes les fenetres sur le bon ecran)
 ;; Recharger :  eww reload
 ;;
@@ -11,8 +11,8 @@
 ;; NOTE (11/09, etape 0 de la colonne elastique) : l'accordeon (un seul
 ;; panneau deplie a la fois) et le detail mail affiche a la place de la
 ;; liste ont ete retires : ils forcaient a cliquer pour voir ce que le
-;; dashboard doit montrer d'un coup d'oeil. Les trois panneaux sont
-;; desormais toujours visibles. Version accordeon : branche refonte-colonne.
+;; dashboard doit montrer d'un coup d'oeil. Les panneaux sont desormais
+;; toujours visibles. Version accordeon : branche refonte-colonne.
 ;;
 ;; NOTE (repli des panneaux) : un clic sur l'en-tete d'un panneau le REPLIE
 ;; (il ne garde que son en-tete et son compteur) pour donner sa place aux
@@ -21,9 +21,10 @@
 ;; replies, et rien n'oblige a cliquer pour lire.
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
-;;   - variables digest recos venir         -> sync.sh
+;;   - variables digest recos venir veille  -> sync.sh
 ;;   - variables h_* y_* t_* r_*            -> mise-en-page.py
-;;   - variable mail_modale, y_mail         -> ui.sh
+;;   - variables mail_modale veille_modale  -> ui.sh, mise-en-page.py
+;;   - variables y_mail y_veille            -> ui.sh
 ;;   - fenetre colonne                      -> ouvrir-colonne.sh
 ;;   - fenetre modale                       -> ui.sh, ouvrir-colonne.sh
 
@@ -34,8 +35,8 @@
 
 ;; --- Hauteur de chaque panneau et position de son bord haut (px) ---------
 ;; Calculees par mise-en-page.py, envoyees en UN seul "eww update" apres
-;; chaque arrivee de donnees (voir publier.sh) et a chaque repli. y_mail
-;; sert a aligner la modale mail (ui.sh).
+;; chaque arrivee de donnees (voir publier.sh) et a chaque repli. y_mail et
+;; y_veille servent a aligner la modale (ui.sh).
 ;; 0 = pas encore calcule (voir le widget panel ci-dessous).
 ;; t_* = panneau tronque : le script n'a pas pu lui donner toute la hauteur
 ;; qu'il demandait, sa liste continue sous le bord (degrade + chevron).
@@ -49,28 +50,32 @@
 (defvar h_reco 0)
 (defvar h_venir 0)
 (defvar h_mail 0)
+(defvar h_veille 0)
 (defvar y_reco 0)
 (defvar y_venir 0)
 (defvar y_mail 0)
+(defvar y_veille 0)
 (defvar t_reco false)
 (defvar t_venir false)
 (defvar t_mail false)
+(defvar t_veille false)
 (defvar r_reco false)
 (defvar r_venir false)
 (defvar r_mail false)
+(defvar r_veille false)
 
 ;; --- Panneau principal : en-tete (chevron, titre, resume, bouton ↻), puis
 ;;     le corps (separateur + zone de defilement) ------------------------
 ;; Attention : eww refuse un (for ...) passe directement en enfant d'un
 ;; widget perso ("can only be used as a child of some container widget") --
 ;; toujours l'envelopper dans un (box ...) cote appelant.
-;; source  = argument passe a sync.sh (digest | recos | venir)
+;; source  = argument passe a sync.sh (digest | recos | venir | veille)
 ;; sync    = heure de la derniere synchro, affichee en infobulle du bouton ↻
 ;; resume  = texte court affiche a droite de l'en-tete ("8 à traiter"...),
 ;;           pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
 ;; hauteur = hauteur TOTALE du panneau en px, bordures comprises (h_reco...)
 ;; tronque = t_reco... : affiche le chevron et le degrade de coupe.
-;; panneau = nom du panneau pour mise-en-page.py (reco | venir | mail)
+;; panneau = nom du panneau pour mise-en-page.py (reco | venir | mail | veille)
 ;; replie  = r_reco... : en-tete seul, corps masque.
 ;;
 ;; Hauteurs : c'est mise-en-page.py qui les decide (repartition elastique),
@@ -78,9 +83,10 @@
 ;; qui ne tient pas dans la hauteur defile.
 ;; :vexpand {hauteur == 0} : filet de securite, seulement tant que les
 ;; hauteurs valent 0 (avant le premier calcul) -- GTK partage alors la
-;; place en tiers au lieu de tout tasser en haut. Une fois les hauteurs
-;; calculees, un panneau ne doit PLUS s'etirer : quand tout est replie, la
-;; place libre doit rester vide (fond d'ecran), pas regonfler les en-tetes.
+;; place a parts egales au lieu de tout tasser en haut. Une fois les
+;; hauteurs calculees, un panneau ne doit PLUS s'etirer : quand tout est
+;; replie, la place libre doit rester vide (fond d'ecran), pas regonfler
+;; les en-tetes.
 (defwidget panel [title sync source resume hauteur tronque panneau replie]
   (box :class "panel ${replie ? 'replie' : ''}" :orientation "v" :space-evenly false
        :vexpand {hauteur == 0} :height hauteur
@@ -94,11 +100,18 @@
       ;; deplie le panneau. mise-en-page.py --basculer relit l'etat,
       ;; bascule CE panneau, recalcule toutes les hauteurs et pousse le tout
       ;; en un seul update.
-      ;; :timeout "5s" : eww TUE une commande onclick au bout de 200ms par
-      ;; defaut (voir le bouton ↻) ; le calcul prend ~0.1s, marge confortable.
-      (eventbox :class "entete-clic" :hexpand true :cursor "pointer" :timeout "5s"
+      ;; setsid -f : commande DETACHEE d'eww, qui rend la main tout de suite.
+      ;; eww TUE une commande onclick au bout de son timeout (200ms par
+      ;; defaut), et sur une EVENTBOX, ":timeout" n'agit pas sur le clic
+      ;; (eww 0.6.0 : cinq groupes de proprietes y declarent chacun leur
+      ;; timeout, celui du clic en dernier -- constate le 11/09 : clics
+      ;; tues a ~200ms malgre :timeout "5s"). Or --basculer prend 200 a
+      ;; 300ms : il etait tue en plein travail (fichier d'etat change, mais
+      ;; pas l'affichage). Detache, plus rien ne peut le couper. Deux clics
+      ;; rapides restent dans l'ordre : le verrou du script les enchaine.
+      (eventbox :class "entete-clic" :hexpand true :cursor "pointer"
                 :tooltip {replie ? "déplier" : "replier (donne la place aux autres)"}
-                :onclick "python3 ~/.config/eww/mise-en-page.py --basculer ${panneau} > ~/.cache/eww/mise-en-page.log 2>&1"
+                :onclick "setsid -f python3 ~/.config/eww/mise-en-page.py --basculer ${panneau} > ~/.cache/eww/mise-en-page.log 2>&1"
         (box :orientation "h" :space-evenly false
           ;; Chevron de repli, a gauche du titre : ▾ ouvert, ▸ replie.
           (label :class "chevron" :text {replie ? "▸" : "▾"})
@@ -112,7 +125,7 @@
           (label :class "coupe" :visible tronque :text "▼"
                  :tooltip "la liste continue : faire défiler")))
       ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
-      ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
+      ;; clair sur tous les en-tetes a la fois ne tient pas dans la largeur
       ;; de la colonne.
       ;; :timeout "15s" : eww TUE une commande onclick au bout de son
       ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
@@ -223,23 +236,25 @@
 (defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
-;; --- Mail affiche dans la modale : son mail_id, "" = modale fermee. Ecrit
-;;     par ui.sh (open / close). Sert aussi a marquer la ligne choisie.
+;; --- Mail affiche dans la modale : son mail_id, "" = aucun. Ecrit par
+;;     ui.sh (open / close). Sert aussi a marquer la ligne choisie.
 (defvar mail_modale "")
 
 ;; --- Ligne de mail : clic -> modale de CE mail, et rien d'autre (les
 ;;     actions sont les boutons de la modale). La ligne reste marquee
 ;;     (classe selected) tant que sa modale est ouverte.
-;; :timeout "5s" : ui.sh enchaine plusieurs appels eww, et eww TUE une
-;; commande onclick au-dela de son timeout (200ms par defaut, voir le
-;; bouton ↻ du widget panel).
+;; setsid -f : ui.sh enchaine plusieurs appels eww (~100ms), et eww TUE
+;; une commande onclick au bout de 200ms -- sur une eventbox, ":timeout" ne
+;; change rien (voir l'en-tete du widget panel). Tuee entre son "eww
+;; update" et son "eww open", la ligne serait marquee sans modale.
+;; Detachee, elle va toujours au bout.
 ;; Deux classes, deux widgets : l'eventbox porte "item" (fond au survol,
 ;; selection) mais IGNORE le padding CSS (GTK3, mesure le 11/09 : lignes
 ;; de 33px au lieu de 37) ; le padding va donc sur la box interieure
 ;; ("item-corps"), sinon mise-en-page.py compterait 4px de trop par mail.
 (defwidget mail_item [it]
-  (eventbox :class "item ${it.mail_id == mail_modale ? 'selected' : ''}" :timeout "5s"
-            :onclick "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
+  (eventbox :class "item ${it.mail_id == mail_modale ? 'selected' : ''}"
+            :onclick "setsid -f bash ~/.config/eww/ui.sh open mail '${it.mail_id}' >/dev/null 2>&1"
     (box :class "item-corps" :orientation "v" :space-evenly false :hexpand true
       (label :class "item-subject ${it.read ? '' : 'nonlu'}"
              :halign "start" :hexpand true :wrap false :truncate true
@@ -266,13 +281,65 @@
 
 
 ;; ==========================================================================
-;;  MODALE MAIL  (clic sur une ligne de mail)
+;;  VEILLE  ("qu'est-ce qui bouge dans mon domaine ?" ; auto-refresh 30 min)
 ;; ==========================================================================
-;; Contenu repris tel quel de la modale d'avant l'accordeon (commit 8c5b890 :
-;; side_panel + detail_content). Un seul ajout : le corps defile (scroll),
-;; la modale ayant desormais une hauteur fixe, et les boutons restent en bas.
+;; La selection, l'ordre et la phrase "pourquoi c'est pour toi" sont faits
+;; par n8n : voir fetch-veille.sh pour le contrat de donnees. Le panneau ne
+;; fait qu'afficher. 30 min : la veille bouge lentement, inutile d'appeler
+;; n8n aussi souvent que pour les mails.
+;; :initial inclut "by_id":{} : meme raison que pour digest (la modale
+;; indexe by_id[...] avant le premier fetch).
+(defpoll veille :interval "30m" :initial "{\"items\":[],\"by_id\":{}}"
+  "bash ~/.config/eww/fetch-veille.sh")
 
-;; --- Separateur + resume du mail (masques si le texte est vide) ---------
+;; --- Item de veille affiche dans la modale : son id, "" = aucun. Ecrit
+;;     par ui.sh ; sert aussi a marquer la ligne choisie. Jamais rempli en
+;;     meme temps que mail_modale (ui.sh vide l'un quand il remplit l'autre).
+(defvar veille_modale "")
+
+;; --- Ligne de veille : UN seul niveau, titre a gauche (coupe par une
+;;     ellipse s'il est trop long), "source · age" a droite. 22px, comme
+;;     une ligne d'A VENIR (ligne_veille dans mise-en-page.py).
+;; Meme traitement que les mails, SANS couleur propre : meme pastille "●"
+;; et meme gras pour ce qui est neuf, meme fond au survol et a la selection
+;; (classes item, item-corps, item-subject, nonlu), meme modale. Ce qui
+;; distingue les deux panneaux, c'est leur en-tete et leur contenu, pas une
+;; couleur : la couleur reste reservee au sens (urgent, retard).
+;; La phrase "pourquoi" n'est PAS ici : elle vit dans la modale.
+;; eventbox + box interieure, setsid -f : memes raisons que mail_item.
+(defwidget veille_item [it]
+  (eventbox :class "item ${it.id == veille_modale ? 'selected' : ''}"
+            :onclick "setsid -f bash ~/.config/eww/ui.sh open veille '${it.id}' >/dev/null 2>&1"
+    (box :class "item-corps" :orientation "h" :space-evenly false :hexpand true
+      (label :class "item-subject ${it.neuf ? 'nonlu' : ''}"
+             :halign "start" :hexpand true :truncate true
+             :text "  ${it.neuf ? '● ' : ''}${it.titre}")
+      (label :class "veille-meta" :halign "end" :visible {it.meta != ''}
+             :text {it.meta}))))
+
+(defwidget veille_box []
+  (panel :title "VEILLE" :sync {veille.synchro ?: '--:--'} :source "veille"
+         :resume {veille.resume ?: ''} :hauteur h_veille :tronque t_veille
+         :panneau "veille" :replie r_veille
+    (label :class "veille-vide" :halign "start" :wrap true
+           :visible {arraylength(veille.items ?: []) == 0}
+           :text "Rien de neuf.")
+    (box :orientation "v" :space-evenly false
+      (for it in {veille.items ?: []}
+        (veille_item :it it)))))
+
+
+;; ==========================================================================
+;;  MODALE  (clic sur une ligne de mail ou de veille)
+;; ==========================================================================
+;; UN seul widget, modale_contenu, parametre par la source : le titre, les
+;; lignes du corps et les boutons changent, la forme reste la meme. Il est
+;; repris de la modale d'avant l'accordeon (commit 8c5b890 : side_panel +
+;; detail_content) ; le corps defile (scroll), la modale ayant une hauteur
+;; fixe, et les boutons restent en bas. modale_mail et modale_veille ne
+;; font que remplir ses parametres.
+
+;; --- Separateur + resume (masques si le texte est vide) ----------------
 (defwidget side_summary [text]
   (box :orientation "v" :space-evenly false :visible {text != ''}
     (box :class "side-sep")
@@ -287,51 +354,88 @@
 (defwidget action [libelle commande]
   (button :class "action-btn ${commande == '' ? 'a-definir' : ''}"
           :active {commande != ''}
-          :tooltip {commande == '' ? 'Emplacement libre : action à définir (eww.yuck, modale_contenu)' : ''}
+          :tooltip {commande == '' ? 'Emplacement libre : action à définir (eww.yuck, modale_mail / modale_veille)' : ''}
           :onclick "setsid -f ${commande} >/dev/null 2>&1"
           libelle))
 
-;; Le mail est passe deja resolu, avec un repli "{}" a CHAQUE niveau
-;; d'indexation : digest.by_id peut etre null avant le premier fetch, et
-;; by_id[mail_modale] l'est si l'id est absent (mail disparu au dernier
+;; L'item est passe deja resolu, avec un repli "{}" a CHAQUE niveau
+;; d'indexation : by_id peut etre null avant le premier fetch, et
+;; by_id[id] l'est si l'id est absent (item disparu au dernier
 ;; rafraichissement). Indexer un champ sur null plante le rendu du widget
-;; entier (constate le 12/08). :visible = securite en plus : contenu nul
-;; tant qu'aucun mail n'est choisi.
+;; entier (constate le 12/08). Un seul des deux contenus est visible :
+;; ui.sh ne remplit jamais mail_modale et veille_modale en meme temps.
 (defwidget modale_box []
-  (box :visible {mail_modale != ''} :vexpand true
-    (modale_contenu :mail {(digest.by_id ?: {})[mail_modale] ?: {}})))
+  (box :orientation "v" :vexpand true :visible {mail_modale != '' || veille_modale != ''}
+    (box :orientation "v" :vexpand true :visible {mail_modale != ''}
+      (modale_mail :mail {(digest.by_id ?: {})[mail_modale] ?: {}}))
+    (box :orientation "v" :vexpand true :visible {veille_modale != ''}
+      (modale_veille :it {(veille.by_id ?: {})[veille_modale] ?: {}}))))
 
-(defwidget modale_contenu [mail]
+;; titre   = en-tete de la modale (a cote de la croix ✕)
+;; ligne1  = premiere ligne du corps, en petit gris ("" = masquee)
+;; ligne2  = deuxieme ligne, plus petite encore ("" = masquee)
+;; texte   = paragraphe principal ("" = masque)
+;; resume  = paragraphe sous un separateur ("" = masque)
+;; l1..l4 / c1..c4 = libelle et commande des quatre boutons (voir action)
+(defwidget modale_contenu [titre ligne1 ligne2 texte resume l1 c1 l2 c2 l3 c3 l4 c4]
   (box :class "panel side" :orientation "v" :space-evenly false :hexpand true :vexpand true
-    ;; En-tete : sujet + croix de fermeture
+    ;; En-tete : titre + croix de fermeture
     (box :class "detail-head" :orientation "h" :space-evenly false
       (label :class "side-title" :halign "start" :hexpand true :wrap true :xalign 0
-             :valign "start" :text {mail.subject ?: '(mail introuvable)'})
+             :valign "start" :text titre)
       (button :class "close-btn" :valign "start" :timeout "5s"
               :onclick "bash ~/.config/eww/ui.sh close" "✕"))
-    ;; Corps : defile si le mail est long
+    ;; Corps : defile si le texte est long
     (scroll :vscroll true :hscroll false :vexpand true
       (box :orientation "v" :space-evenly false
         (label :class "side-from" :halign "start" :wrap true :xalign 0
-               :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
+               :visible {ligne1 != ''} :text ligne1)
         (label :class "side-badges" :halign "start"
-               :text "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}")
+               :visible {ligne2 != ''} :text ligne2)
         (label :class "side-reason" :halign "start" :wrap true :xalign 0
-               :text {mail.reason ?: ''})
-        (side_summary :text {mail.summary ?: ''})))
-    ;; Actions, toujours visibles en bas. Ce sont ELLES qui agissent sur le
-    ;; mail (le clic sur la ligne ne fait qu'ouvrir la modale).
+               :visible {texte != ''} :text texte)
+        (side_summary :text resume)))
+    ;; Actions, toujours visibles en bas. Ce sont ELLES qui agissent sur
+    ;; l'item (le clic sur la ligne ne fait qu'ouvrir la modale).
     (box :class "detail-actions" :orientation "h" :space-evenly true
-      ;; Gmail web plutot que Thunderbird (choix du 11/09) : le JSON ne
-      ;; donne que l'id Gmail, Thunderbird n'aurait pu que s'ouvrir, sans
-      ;; afficher CE mail.
-      (action :libelle "Ouvrir email" :commande "xdg-open '${mail.url ?: ''}'")
-      ;; TODO : trois emplacements libres. Pour en cabler un : remplacer
-      ;; le libelle et mettre la commande shell (les champs du mail sont
-      ;; dans mail.*, ex. ${mail.mail_id}).
-      (action :libelle "à définir" :commande "")
-      (action :libelle "à définir" :commande "")
-      (action :libelle "à définir" :commande ""))))
+      (action :libelle l1 :commande c1)
+      (action :libelle l2 :commande c2)
+      (action :libelle l3 :commande c3)
+      (action :libelle l4 :commande c4))))
+
+;; --- Contenu MAIL. Bouton 1 : Gmail web plutot que Thunderbird (choix du
+;; 11/09) : le JSON ne donne que l'id Gmail, Thunderbird n'aurait pu que
+;; s'ouvrir, sans afficher CE mail.
+;; TODO : trois emplacements libres (en attente de Gauthier). Pour en
+;; cabler un : remplacer le libelle et mettre la commande shell (les champs
+;; du mail sont dans mail.*, ex. ${mail.mail_id}).
+(defwidget modale_mail [mail]
+  (modale_contenu
+    :titre {mail.subject ?: '(mail introuvable)'}
+    :ligne1 "${mail.from ?: ''}  <${mail.email ?: ''}>"
+    :ligne2 "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}"
+    :texte {mail.reason ?: ''}
+    :resume {mail.summary ?: ''}
+    :l1 "Ouvrir email" :c1 "xdg-open '${mail.url ?: ''}'"
+    :l2 "à définir" :c2 ""
+    :l3 "à définir" :c3 ""
+    :l4 "à définir" :c4 ""))
+
+;; --- Contenu VEILLE : le titre de l'article, "source · age", puis la
+;; phrase de curation ("pourquoi c'est pour toi"), qui ne s'affiche QUE ici.
+;; TODO etape 6 : bouton 1 = "Ouvrir la source" (xdg-open sur it.url).
+;; TODO : emplacements 2 a 4, en attente de Gauthier. Ne rien inventer.
+(defwidget modale_veille [it]
+  (modale_contenu
+    :titre {it.titre ?: '(article introuvable)'}
+    :ligne1 {it.meta ?: ''}
+    :ligne2 ""
+    :texte {it.pourquoi ?: ''}
+    :resume ""
+    :l1 "à définir" :c1 ""
+    :l2 "à définir" :c2 ""
+    :l3 "à définir" :c3 ""
+    :l4 "à définir" :c4 ""))
 
 
 ;; ==========================================================================
@@ -418,26 +522,30 @@
   ;;    fond d'ecran (mode bureau calme).
   ;;  - le bandeau, dernier enfant de "colonne", reste donc colle en bas
   ;;    dans tous les cas.
-  ;; Les ecarts ne changent pas : 2 entre les panneaux + 1 entre "panneaux"
-  ;; et le bandeau = 3, comme avant (n x ECART dans mise-en-page.py).
+  ;; Ecarts : 3 entre les quatre panneaux + 1 entre "panneaux" et le
+  ;; bandeau = 4 = n x ECART dans mise-en-page.py.
   (box :class "colonne" :orientation "v" :space-evenly false :spacing 16
-    ;; Ordre : qu'est-ce que je fais maintenant -> qu'est-ce qui est engage
-    ;; -> qu'est-ce qui demande une reponse.
+    ;; Ordre = un degrade d'urgence : qu'est-ce que je fais maintenant ->
+    ;; qu'est-ce qui est engage -> qu'est-ce qui demande une reponse ->
+    ;; qu'est-ce qui bouge dans mon domaine. La veille, seule chose sans
+    ;; echeance, vient en dernier : elle ne s'intercale pas dans ce qui en a.
     (box :class "panneaux" :orientation "v" :space-evenly false :spacing 16 :vexpand true
       (recos_box)
       (venir_box)
-      (digest_box))
+      (digest_box)
+      (veille_box))
     (bandeau)))
 
-;; --- Modale mail : fenetre SEPAREE, meme couche que la colonne (bg/dock :
-;; les clics y fonctionnent, seul le focus clavier manque -- inutile ici).
+;; --- Modale : fenetre SEPAREE, meme couche que la colonne (bg/dock : les
+;; clics y fonctionnent, seul le focus clavier manque -- inutile ici).
 ;; Ouverte/fermee REELLEMENT par ui.sh, jamais mappee en permanence : une
 ;; fenetre transparente laissee mappee laisse un fond fantome sous picom
 ;; (constate le 12/08). Geometrie : ARGUMENTS calcules par ui.sh au clic
 ;; (eww refuse une variable dans :geometry) :
 ;;   x       = -(marge droite + largeur colonne + 14) : juste a gauche
-;;   y       = haut du panneau mails (y_mail) AU MOMENT DU CLIC, recale vers
-;;             le haut si la modale depasserait le bas de l'ecran
+;;   y       = haut du panneau d'ou vient l'item (y_mail ou y_veille) AU
+;;             MOMENT DU CLIC, recale vers le haut si la modale depasserait
+;;             le bas de l'ecran (toujours le cas pour la veille, en bas)
 ;;   hauteur = 420px, propre a la modale
 ;; Un argument est fige a l'ouverture : si les panneaux changent de hauteur
 ;; pendant que la modale est ouverte, elle ne bouge pas. Exception : replier

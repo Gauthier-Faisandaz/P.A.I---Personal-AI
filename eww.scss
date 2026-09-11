@@ -20,7 +20,11 @@
 
    Panneau replie (HAUTEUR_ENTETE dans le script) = 59px :
    2 x $bordure + 2 x $panneau-pad-v + ligne de $police-sync (29px),
-   SANS $entete-marge (retiree par ".panel.replie .header", plus bas). */
+   SANS $entete-marge (retiree par ".panel.replie .header", plus bas).
+
+   Ligne de veille (ligne_veille dans le script) = 22px :
+   2 x $ligne-pad + ligne de $police (18px). Son "source - age" en 13px
+   (17px) tient dans la ligne sans l'agrandir. */
 $police:              15px;  /* corps du texte                          */
 $police-petite:       13px;  /* detail d'une recommandation             */
 $police-meta:         12px;  /* 2e ligne d'un mail (expediteur, age)    */
@@ -227,6 +231,18 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 .sect-label.venir-retard { color: #ff6b6b; }
 .venir-vide { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 .mail-vide  { color: rgba(255, 255, 255, 0.6); font-style: italic; }
+
+/* --- VEILLE : une ligne par item (titre, puis "source - age" a droite) -- */
+/* Meme traitement que les mails (classes .item, .item-corps,
+   .item-subject, .nonlu, plus haut) : AUCUNE couleur propre a la veille,
+   la couleur reste reservee au sens (urgent, retard). Seul ajout : la
+   meta a droite, en gris comme l'echeance d'A VENIR. */
+.veille-meta {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.70);
+  margin-left: 14px;
+}
+.veille-vide { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 
 /* --- Panneau tronque : sa liste continue sous le bord ------------------- */
 /* Degrade pose par-dessus le bas de la liste (widget overlay, eww.yuck) :

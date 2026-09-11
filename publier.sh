@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # publier.sh - dernier maillon de chaque fetch-*.sh :
-#     ... | bash ~/.config/eww/publier.sh digest|recos|venir
+#     ... | bash ~/.config/eww/publier.sh digest|recos|venir|veille
 #
 # 1. garde une copie du JSON dans ~/.cache/eww/bus/<nom>.json : c'est la
-#    que mise-en-page.py lit les donnees des trois panneaux ;
+#    que mise-en-page.py lit les donnees des panneaux ;
 # 2. renvoie le JSON tel quel sur la sortie standard : c'est elle que lit le
 #    defpoll (ou sync.sh), rien ne change pour eww ;
 # 3. relance le calcul des hauteurs des panneaux, en arriere-plan.
@@ -15,7 +15,7 @@
 BUS="$HOME/.cache/eww/bus"
 nom="$1"
 case "$nom" in
-  digest|recos|venir) ;;
+  digest|recos|venir|veille) ;;
   *) echo "publier.sh : nom inconnu '$nom'" >&2; cat; exit 1 ;;
 esac
 mkdir -p "$BUS"

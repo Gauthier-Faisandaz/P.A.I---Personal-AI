@@ -62,7 +62,7 @@ echo "$(date '+%F %T') - colonne sur $TARGET : marge ${MARGE}px, droite ${MARGE_
 # La modale est placee par rapport a la colonne : si la colonne bouge
 # (marge.sh, changement d'ecran), une modale ouverte serait mal placee.
 "$EWW" close modale 2>/dev/null
-"$EWW" update mail_modale="" 2>/dev/null
+"$EWW" update mail_modale="" veille_modale="" 2>/dev/null
 
 # Fermer d'abord (sans erreur si deja fermee) : le script est relancable.
 "$EWW" close colonne 2>/dev/null
