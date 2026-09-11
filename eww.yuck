@@ -258,12 +258,20 @@
 ;; Geometrie : meme marge en haut et en bas de l'ecran (symetrie). Il
 ;; faudrait donc une hauteur "100% - 2 x marge", mais eww 0.6.0 refuse de
 ;; melanger les unites dans une meme valeur ("96%-24px" -> "Invalid unit",
-;; teste le 10/09), et un % ne tombe juste que sur un seul ecran. D'ou deux
-;; ARGUMENTS de fenetre, calcules et passes par start.sh a l'ouverture
-;; (eww open colonne --arg marge=20px --arg hauteur=1040px) :
+;; teste le 10/09), et un % ne tombe juste que sur un seul ecran. D'ou des
+;; ARGUMENTS de fenetre, calcules et passes par ouvrir-colonne.sh a
+;; l'ouverture (eww open colonne --arg marge=20px --arg hauteur=1040px
+;; --arg droite=-48px) :
 ;;   marge   = ecart bord de l'ecran <-> haut de la colonne (et bas du bandeau)
 ;;   hauteur = hauteur de l'ecran cible (lue par xrandr) - 2 x marge
-;; Le reglage de la marge est dans start.sh (MARGE), nulle part ailleurs.
+;;   droite  = ecart au bord droit, NEGATIF (anchor right : x negatif = vers
+;;             la gauche depuis le bord droit), pour le panneau LXQt
+;; Reglages : geometrie.conf (MARGE, MARGE_DROITE), nulle part ailleurs.
+;;
+;; Pourquoi des arguments et pas une variable (defvar marge_droite) : eww
+;; 0.6.0 refuse une variable globale dans :geometry ("Unknown variable",
+;; teste le 11/09) et fige la position a l'ouverture. Changer la marge =
+;; rouvrir la fenetre : c'est ce que fait marge.sh, sans redemarrer eww.
 ;;
 ;; Picom floute TOUTE la surface d'une fenetre Eww (voir picom.conf) : les
 ;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
@@ -271,9 +279,9 @@
 ;;
 ;; !! L'ecart (:spacing 16) et la largeur (:width "33%") sont DOUBLES dans
 ;; mise-en-page.py (ECART, LARGEUR_PCT) : a modifier aux deux endroits.
-(defwindow colonne [marge hauteur]
+(defwindow colonne [marge hauteur droite]
   :monitor 0
-  :geometry (geometry :x "-24px" :y marge :width "33%" :height hauteur :anchor "top right")
+  :geometry (geometry :x droite :y marge :width "33%" :height hauteur :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   ;; Ordre : qu'est-ce que je fais maintenant -> qu'est-ce qui est engage
   ;; -> qu'est-ce qui demande une reponse.

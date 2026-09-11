@@ -22,8 +22,14 @@ mkdir -p "$CACHE"
 log() { printf '%s %s\n' "$(date '+%H:%M:%S.%3N')" "$*" >> "$LOG"; }
 
 # Une seule instance a la fois (meme principe que hoverd.sh en son temps).
+# -w 5 (attendre jusqu'a 5 s) et non -n (abandonner tout de suite) : le
+# verrou est herite par le "sleep 2" de la boucle ci-dessous. Quand
+# start.sh tue l'ancien surveillant, ce sleep orphelin garde le verrou
+# jusqu'a 2 s de plus ; avec -n, le nouveau surveillant abandonnait aussitot
+# et le dashboard restait SANS surveillant (constate le 11/09 : watchdog.log
+# vide depuis le matin). Un vrai second surveillant attend 5 s puis s'arrete.
 exec 9>"$LOCK"
-flock -n 9 || exit 0
+flock -w 5 9 || exit 0
 
 log "watchdog demarre (pid $$)"
 
@@ -38,15 +44,9 @@ full_restart() {
   : > "$CACHE/eww-daemon.out.log"
   RUST_LOG=debug "$EWW" daemon > "$CACHE/eww-daemon.out.log" 2>&1 &
   sleep 1.5
-  TARGET="$(cat "$CACHE/target_screen" 2>/dev/null)"
-  # Arguments de la colonne (marge, hauteur) calcules par start.sh. Pas de
-  # guillemets autour de $ARGS : il contient plusieurs options a separer.
-  # Repli sur les valeurs d'avant si le fichier manque.
-  ARGS="$(cat "$CACHE/colonne_args" 2>/dev/null)"
-  [ -n "$ARGS" ] || ARGS="--arg marge=24px --arg hauteur=93%"
-  "$EWW" close colonne 2>/dev/null
-  # shellcheck disable=SC2086
-  "$EWW" open colonne --screen "$TARGET" $ARGS 2>/dev/null
+  # Meme ecran et meme geometrie que start.sh : ouvrir-colonne.sh relit
+  # target_screen et geometrie.conf.
+  bash "$HOME/.config/eww/ouvrir-colonne.sh" 2>/dev/null
   log "redemarrage termine"
 }
 

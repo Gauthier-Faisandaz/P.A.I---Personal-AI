@@ -302,7 +302,11 @@ def pousser(res):
     """UN seul "eww update" pour toutes les variables : les trois panneaux
     changent de taille (et de signal de coupe) dans le meme rendu, sans
     etat intermediaire ou la colonne serait trop haute ou trop courte."""
-    subprocess.run([EWW, "update", *affectations(res)], timeout=5, check=False)
+    # RUST_LOG=error : le demon est lance avec RUST_LOG=debug (start.sh) et
+    # le transmet aux scripts qu'il lance ; sans ca, ce "eww update" noierait
+    # mise-en-page.log sous ses messages de debogage.
+    subprocess.run([EWW, "update", *affectations(res)], timeout=5, check=False,
+                   env={**os.environ, "RUST_LOG": "error"})
 
 
 def afficher(res):
