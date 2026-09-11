@@ -229,6 +229,9 @@
 ;; Picom floute TOUTE la surface d'une fenetre Eww (voir picom.conf) : les
 ;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
 ;; le voile blanc ni la bordure des panneaux.
+;;
+;; !! L'ecart (:spacing 16) et la largeur (:width "33%") sont DOUBLES dans
+;; mise-en-page.py (ECART, LARGEUR_PCT) : a modifier aux deux endroits.
 (defwindow colonne [marge hauteur]
   :monitor 0
   :geometry (geometry :x "-24px" :y marge :width "33%" :height hauteur :anchor "top right")

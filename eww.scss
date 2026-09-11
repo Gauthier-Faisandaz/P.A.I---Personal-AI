@@ -1,5 +1,44 @@
 /* eww.scss - glassmorphism: white text + border, transparent white glass fill */
 
+/* ATTENTION : ce fichier doit rester 100% ASCII, commentaires compris. Un
+   seul caractere non ASCII et le compilateur sass ajoute '@charset "UTF-8";'
+   en tete du CSS, regle que GTK refuse ("unknown @ rule") : TOUTE la feuille
+   de style saute (constate le 10/09). */
+
+/* ==========================================================================
+   CONSTANTES DE MISE EN PAGE : tout ce qui fixe une HAUTEUR dans la colonne
+   ==========================================================================
+   Ces valeurs sont DOUBLEES dans mise-en-page.py (bloc CONSTANTES, en tete),
+   qui s'en sert pour calculer la hauteur de chaque panneau. Toute retouche
+   ici doit y etre reportee, puis verifiee avec :
+       python3 ~/.config/eww/mise-en-page.py test
+   L'ecart entre panneaux (:spacing 16) et la largeur de la colonne (33%)
+   sont dans eww.yuck, eux aussi doubles dans le script.
+
+   Hauteur d'une ligne de texte (DejaVu Sans Mono, mesuree avec Pango) :
+   15px -> 18px, 13px -> 17px, 12px -> 15px, 24px -> 29px. */
+$police:              15px;  /* corps du texte                          */
+$police-petite:       13px;  /* detail d'une recommandation             */
+$police-meta:         12px;  /* 2e ligne d'un mail (expediteur, age)    */
+$police-puce:         12px;  /* pastille de priorite d'une reco         */
+$police-sync:         24px;  /* bouton de synchro : fixe la hauteur de
+                                l'en-tete (29px)                        */
+$bordure:             1px;
+$panneau-pad-v:       14px;  /* haut et bas d'un panneau                */
+$panneau-pad-h:       18px;  /* gauche et droite                        */
+$entete-marge:        4px;   /* sous l'en-tete                          */
+$sep-haut:            6px;   /* separateur = 1px + ces deux marges      */
+$sep-bas:             12px;
+$section-marge:       12px;  /* sous chaque groupe (mails, a venir)     */
+$ligne-pad:           2px;   /* haut ET bas d'une ligne de mail / a venir */
+$reco-tete-marge:     2px;   /* titre -> detail d'une reco              */
+$reco-pad-bas:        8px;   /* sous une reco : padding, trait 1px...   */
+$reco-marge:          12px;  /* ... puis cette marge                    */
+$reco-puce-marge:     8px;   /* pastille -> titre (joue sur la largeur) */
+$reco-detail-retrait: 18px;  /* retrait du detail (joue sur la largeur) */
+$bandeau-haut:        38px;  /* + 2 x $bordure                          */
+
+
 * { all: unset; }
 
 /* Fond de la fenetre GTK elle-meme transparent : seuls les panneaux et le
@@ -9,19 +48,14 @@ window { background-color: transparent; }
 
 .panel {
   background-color: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 14px 18px;
+  border: $bordure solid rgba(255, 255, 255, 0.25);
+  padding: $panneau-pad-v $panneau-pad-h;
   color: white;
   font-family: "DejaVu Sans Mono", monospace;
-  font-size: 15px;
+  font-size: $police;
 }
 
-/* ATTENTION : ce fichier doit rester 100% ASCII, commentaires compris. Un
-   seul caractere non ASCII et le compilateur sass ajoute '@charset "UTF-8";'
-   en tete du CSS, regle que GTK refuse ("unknown @ rule") : TOUTE la feuille
-   de style saute (constate le 10/09). */
-
-.header { margin-bottom: 4px; }
+.header { margin-bottom: $entete-marge; }
 .title  { font-weight: bold; }
 
 /* resume a droite de l'en-tete ("8 a traiter"...) */
@@ -41,16 +75,16 @@ tooltip {
 .sep {
   background-color: white;
   min-height: 1px;
-  margin: 6px 0 12px 0;
+  margin: $sep-haut 0 $sep-bas 0;
 }
 
-/* defilement vertical des panneaux a taille fixe (widget "panel" de eww.yuck) :
+/* defilement vertical des corps de panneau (widget "panel" de eww.yuck) :
    "* { all: unset; }" rend sinon la barre invisible */
 scrollbar { background-color: transparent; }
 scrollbar slider { min-width: 4px; background-color: rgba(255, 255, 255, 0.30); }
 scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 
-.section    { margin-bottom: 12px; }
+.section    { margin-bottom: $section-marge; }
 .sect-label { font-weight: bold; }
 .sect-item  { color: white; }
 
@@ -63,10 +97,10 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 }
 .sync-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
 
-/* icone de synchro dans l'en-tete (a droite de "Synchronisation - hh:mm") */
+/* icone de synchro dans l'en-tete, a droite du resume */
 .sync-icon {
   margin-left: 8px;
-  font-size: 24px;
+  font-size: $police-sync;
   color: white;
   padding: 0 4px;
   background-color: transparent;
@@ -76,27 +110,27 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 /* --- Boite de reception : lignes de mail (lu / non lu) ------------------ */
 /* Pas de :hover depuis l'etape 0 : les lignes ne sont plus cliquables (le
    survol suggererait le contraire). Il reviendra avec la modale (etape 5). */
-.item { background-color: transparent; border: none; padding: 2px 4px;  }
+.item { background-color: transparent; border: none; padding: $ligne-pad 4px;  }
 .item-subject { color: white; }
 .item-subject.nonlu { font-weight: bold; }
-.item-meta { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.item-meta { font-size: $police-meta; color: rgba(255, 255, 255, 0.55); }
 
 /* --- Recommandations du jour --------------------------------- */
 .reco-card {
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  margin-bottom: $reco-marge;
+  padding-bottom: $reco-pad-bas;
+  border-bottom: $bordure solid rgba(255, 255, 255, 0.18);
 }
-.reco-head  { margin-bottom: 2px; }
+.reco-head  { margin-bottom: $reco-tete-marge; }
 .reco-title { font-weight: bold; }
 
 .reco-detail {
-  font-size: 13px;
+  font-size: $police-petite;
   color: rgba(255, 255, 255, 0.82);
-  margin-left: 18px;
+  margin-left: $reco-detail-retrait;
 }
 
-.reco-dot { margin-right: 8px; font-size: 12px; }
+.reco-dot { margin-right: $reco-puce-marge; font-size: $police-puce; }
 .reco-dot.haute   { color: #ff6b6b; }
 .reco-dot.moyenne { color: #ffd166; }
 .reco-dot.basse   { color: #8ecae6; }
@@ -107,7 +141,7 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 /* Les titres de groupe reutilisent .section / .sect-label de la boite de
    reception. Le groupe "retard" (classe venir-retard) et l'echeance de ses
    elements (classe retard) sont en rouge : c'est ce qui doit se voir. */
-.venir-item   { padding: 2px 4px; }
+.venir-item   { padding: $ligne-pad 4px; }
 .venir-glyphe { margin-right: 8px; color: rgba(255, 255, 255, 0.75); }
 .venir-titre  { color: white; }
 .venir-quand {
@@ -125,9 +159,9 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
    les 633px de la colonne. */
 .bandeau {
   background-color: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: $bordure solid rgba(255, 255, 255, 0.25);
   padding: 0 18px;
-  min-height: 38px;
+  min-height: $bandeau-haut;
   color: white;
   font-family: "DejaVu Sans Mono", monospace;
   font-size: 12px;
