@@ -223,10 +223,9 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 
 /* --- A VENIR : lignes (glyphe, titre, echeance) ------------------------- */
 /* Les titres de groupe reutilisent .section / .sect-label de la boite de
-   reception. Pour le groupe "retard", seul le TRIANGLE du titre est rouge
-   (.sect-puce.venir-retard), le texte "EN RETARD" reste blanc (retour
-   utilisateur 11/09) ; l'echeance de ses elements (classe retard) aussi
-   est rouge : c'est ce qui doit se voir. */
+   reception. Tout est en blanc, groupe "retard" compris : il se distingue
+   par son icone (triangle d'alerte au lieu de la fleche, voir eww.yuck),
+   pas par une couleur -- le rouge a ete essaye puis ecarte (11/09). */
 .venir-item   { padding: $ligne-pad 4px; }
 .venir-glyphe { margin-right: 8px; color: rgba(255, 255, 255, 0.75); }
 .venir-titre  { color: white; }
@@ -235,12 +234,6 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   color: rgba(255, 255, 255, 0.70);
   margin-left: 14px;
 }
-.venir-quand.retard     { color: #ff6b6b; }
-/* triangle du titre de groupe, label a part. 9px = la largeur d'UN
-   caractere en 15px : remplace l'espace qui separait le triangle du texte (eww
-   supprime l'espace en tete d'un label, constate le 11/09). */
-.sect-puce { margin-right: 9px; }
-.sect-puce.venir-retard { color: #ff6b6b; }
 .venir-vide { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 .mail-vide  { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 

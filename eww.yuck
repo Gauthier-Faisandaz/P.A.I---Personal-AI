@@ -203,8 +203,8 @@
   "bash ~/.config/eww/fetch-venir.sh")
 
 ;; --- Ligne : glyphe (▪ evenement, ☐ tache), titre tronque, echeance a
-;;     droite. cle = cle du groupe ("retard"...) : sert de classe CSS, pour
-;;     colorer l'echeance des elements en retard. Les champs type / titre /
+;;     droite. cle = cle du groupe ("retard"...) : posee en classe CSS sur
+;;     l'echeance (aucun style pour l'instant : tout est en blanc). Les champs type / titre /
 ;;     quand existent toujours (completes par fetch-venir.sh).
 (defwidget venir_item [it cle]
   (box :class "venir-item" :orientation "h" :space-evenly false
@@ -216,17 +216,14 @@
 
 ;; --- Groupe : titre ("► EN RETARD · 1"), puis ses lignes. Les groupes vides
 ;;     sont retires par fetch-venir.sh : jamais de titre orphelin ici.
-;;     Le triangle est un label a part : c'est LUI seul qui prend la couleur
-;;     du groupe (rouge pour "retard"), le texte reste blanc (retour
-;;     utilisateur 11/09). Une seule ligne de 18px : hauteur inchangee pour
-;;     mise-en-page.py.
+;;     Tout en blanc : le groupe en retard se distingue par ⚠ a la place
+;;     de ►, le meme signe que les mails urgents de la boite de reception
+;;     (un seul code visuel pour "attention"). Rouge essaye puis ecarte
+;;     (retour utilisateur 11/09).
 (defwidget venir_groupe [g]
   (box :class "section" :orientation "v" :space-evenly false
-    (box :orientation "h" :space-evenly false :halign "start"
-      (label :class "sect-label sect-puce venir-${g.cle}" :text "►")
-      ;; pas d'espace en tete : eww le supprime ; l'ecart est la marge de
-      ;; .sect-puce (eww.scss)
-      (label :class "sect-label" :text "${g.entete}"))
+    (label :class "sect-label venir-${g.cle}" :halign "start"
+           :text "${g.cle == 'retard' ? '⚠' : '►'} ${g.entete}")
     (for it in {g.items}
       (venir_item :it it :cle {g.cle}))))
 
