@@ -12,10 +12,9 @@
 ;; sur cette base saine.
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
-;;   - variables ouvert / opened_id         -> ui.sh
+;;   - variables ouvert / mail_ouvert       -> ui.sh
 ;;   - variables digest recos venir         -> sync.sh
-;;   - fenetres colonne detail              -> start.sh, ui.sh,
-;;     eww-watchdog.sh
+;;   - fenetre colonne                      -> start.sh, eww-watchdog.sh
 
 
 ;; ==========================================================================
@@ -82,24 +81,23 @@
     (label :class "synthese" :halign "start" :xalign 0
            :wrap true :lines 2 :truncate true
            :visible {ouvert != id && semi != ''} :text semi)
-    ;; Corps : visible uniquement sur le panneau ouvert.
+    ;; Corps : visible uniquement sur le panneau ouvert. Le defilement n'est
+    ;; PAS fait ici mais par l'appelant, avec (defil ...) : le panneau mails
+    ;; a besoin de DEUX zones de defilement independantes (liste et detail)
+    ;; pour que la liste retrouve sa position au retour du detail.
     (box :orientation "v" :space-evenly false :vexpand true :visible {ouvert == id}
       (box :class "sep")
-      ;; Le scroll (vertical seulement) absorbe le contenu qui depasse la
-      ;; hauteur disponible ; les labels non wrappes ont :truncate true pour
-      ;; ne pas elargir la fenetre.
-      (scroll :class "sections" :vscroll true :hscroll false :vexpand true
-        (box :orientation "v" :space-evenly false
-          (children))))))
+      (children))))
 
-;; --- Panneau lateral de detail : titre + bouton ✕, puis le contenu -------
-(defwidget side_panel [title onclose]
-  (box :class "panel side" :orientation "v" :space-evenly false
-    (box :class "detail-head" :orientation "h" :space-evenly false
-      (label :class "side-title" :halign "start" :hexpand true :wrap true :valign "start"
-             :text title)
-      (button :class "close-btn" :valign "start" :onclick onclose "✕"))
-    (children)))
+;; --- Zone de defilement d'un corps de panneau -----------------------------
+;; Le scroll (vertical seulement) absorbe le contenu qui depasse la hauteur
+;; disponible ; les labels non wrappes ont :truncate true pour ne pas
+;; elargir la fenetre. Meme contrainte que panel : un (for ...) doit etre
+;; enveloppe dans un (box ...) cote appelant.
+(defwidget defil []
+  (scroll :class "sections" :vscroll true :hscroll false :vexpand true
+    (box :orientation "v" :space-evenly false
+      (children))))
 
 ;; --- Separateur + texte long du detail (masques si le texte est vide) ----
 (defwidget side_summary [text]
@@ -117,7 +115,11 @@
 ;; ==========================================================================
 ;;  DIGEST MAIL  (clic = detail ; auto-refresh 5 min)
 ;; ==========================================================================
-(defvar opened_id "")
+;; --- Detail in-place : "" = la liste est affichee ; sinon, mail_id du mail
+;;     dont le detail REMPLACE la liste, dans le panneau (pas de popup).
+;;     Remis a "" par ui.sh quand on change de panneau : sinon le panneau
+;;     mails se rouvrirait sur un detail au lieu de la liste.
+(defvar mail_ouvert "")
 
 ;; :initial inclut "by_id":{} : sans ca, digest.by_id vaut null tant que
 ;; fetch-digest.sh n'a pas rendu son premier resultat, et indexer [id]
@@ -126,10 +128,12 @@
 (defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
-;; --- Item : clic -> detail ; highlight persistant sur le mail ouvert -----
+;; --- Item : clic -> detail du mail, a la place de la liste ---------------
+;; Simple "eww update" (chemin absolu du binaire, comme dans les scripts) :
+;; il n'y a plus de fenetre a ouvrir, juste une variable a changer.
 (defwidget mail_item [it]
-  (eventbox :class "item ${it.mail_id == opened_id ? 'selected' : ''}"
-            :onclick "bash ~/.config/eww/ui.sh open '${it.mail_id}'"
+  (eventbox :class "item"
+            :onclick "~/.cargo/bin/eww update mail_ouvert='${it.mail_id}'"
     (box :orientation "v" :space-evenly false :hexpand true
       (label :class "item-subject ${it.read ? '' : 'nonlu'}"
              :halign "start" :hexpand true :wrap false :truncate true
@@ -143,36 +147,24 @@
     (for it in {items ?: []}
       (mail_item :it it))))
 
-(defwidget digest_box []
-  (panel :id "mail" :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
-         :resume {digest.resume ?: ''} :semi ""
-    (box :orientation "v" :space-evenly false
-      (for s in {digest.sections ?: []}
-        (section :label {s.label} :items {s.items})))))
-
-;; --- Detail (clic, fermable) -----------------------------------------------
-;; Fenetre ouverte/fermee reellement (eww open/close) par ui.sh au moment du
-;; clic -- PAS mappee en permanence (constate le 12/08 : une fenetre
-;; transparente mappee en continu, meme contenu masque via :visible, laisse
-;; un fond fantome visible au repos sous ce compositeur). Le :visible
-;; ci-dessous reste une securite supplementaire (contenu nul tant que
-;; opened_id est vide), mais c'est bien l'open/close reel qui evite le fond
-;; fantome. digest.by_id[opened_id] passe par un repli "{}" a CHAQUE niveau
-;; d'indexation (digest.by_id lui meme peut etre null avant le premier
-;; fetch, et digest.by_id[opened_id] peut l'etre aussi si l'id est absent)
-;; avant tout acces a un champ, dans un sous-widget dedie -- sinon le rendu
-;; entier plante.
-(defwidget detail_box []
-  (box :visible {opened_id != ''}
-    (detail_content :mail {(digest.by_id ?: {})[opened_id] ?: {}})))
-
-(defwidget detail_content [mail]
-  (side_panel :title {mail.subject ?: ''} :onclose "bash ~/.config/eww/ui.sh close"
-    (label :class "side-from" :halign "start" :wrap true
+;; --- Detail d'un mail, affiche A LA PLACE de la liste (etape 7) ----------
+;; Bouton ← : retour a la liste. Le mail est passe deja resolu par
+;; digest_box, avec un repli "{}" a CHAQUE niveau d'indexation (digest.by_id
+;; lui-meme peut etre null avant le premier fetch, et by_id[mail_ouvert]
+;; l'est si l'id est vide ou absent) : indexer un champ sur null plante le
+;; rendu du widget entier (constate le 12/08).
+(defwidget mail_detail [mail]
+  (box :class "mail-detail" :orientation "v" :space-evenly false :vexpand true
+    (box :class "detail-head" :orientation "h" :space-evenly false
+      (button :class "retour-btn" :valign "start"
+              :onclick "~/.cargo/bin/eww update mail_ouvert=''" "←")
+      (label :class "side-title" :halign "start" :hexpand true :wrap true :xalign 0
+             :text {mail.subject ?: ''}))
+    (label :class "side-from" :halign "start" :wrap true :xalign 0
            :text "${mail.from ?: ''}  <${mail.email ?: ''}>")
     (label :class "side-badges" :halign "start"
            :text "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}")
-    (label :class "side-reason" :halign "start" :wrap true
+    (label :class "side-reason" :halign "start" :wrap true :xalign 0
            :text {mail.reason ?: ''})
     (side_summary :text {mail.summary ?: ''})
     ;; 3 derniers = placeholders a cabler plus tard
@@ -181,6 +173,23 @@
       (button :class "action-btn" "Action 2")
       (button :class "action-btn" "Action 3")
       (button :class "action-btn" "Action 4"))))
+
+;; --- Panneau : la liste OU le detail, jamais les deux ---------------------
+;; Deux zones de defilement distinctes, une seule visible (:visible libere
+;; la place, voir panel). La liste n'est que MASQUEE pendant le detail : au
+;; retour, elle revient telle quelle, a la meme position de defilement --
+;; avec un seul scroll partage, un detail plus court la ramenerait en haut.
+(defwidget digest_box []
+  (panel :id "mail" :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
+         :resume {digest.resume ?: ''} :semi ""
+    (box :orientation "v" :space-evenly false :vexpand true :visible {mail_ouvert == ""}
+      (defil
+        (box :orientation "v" :space-evenly false
+          (for s in {digest.sections ?: []}
+            (section :label {s.label} :items {s.items})))))
+    (box :orientation "v" :space-evenly false :vexpand true :visible {mail_ouvert != ""}
+      (defil
+        (mail_detail :mail {(digest.by_id ?: {})[mail_ouvert] ?: {}})))))
 
 
 ;; ==========================================================================
@@ -204,12 +213,13 @@
 (defwidget recos_box []
   (panel :id "reco" :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
          :resume {recos.resume ?: ''} :semi {recos.synthese ?: ''}
-    (label :class "reco-empty" :halign "start" :wrap true
-           :visible {arraylength(recos.recommandations ?: []) == 0}
-           :text "Aucune recommandation pour le moment.")
-    (box :orientation "v" :space-evenly false
-      (for reco in {recos.recommandations ?: []}
-        (reco_card :reco reco)))))
+    (defil
+      (label :class "reco-empty" :halign "start" :wrap true
+             :visible {arraylength(recos.recommandations ?: []) == 0}
+             :text "Aucune recommandation pour le moment.")
+      (box :orientation "v" :space-evenly false
+        (for reco in {recos.recommandations ?: []}
+          (reco_card :reco reco))))))
 
 
 ;; ==========================================================================
@@ -245,12 +255,13 @@
 (defwidget venir_box []
   (panel :id "venir" :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
          :resume {venir.resume ?: ''} :semi ""
-    (label :class "venir-vide" :halign "start" :wrap true
-           :visible {arraylength(venir.groupes ?: []) == 0}
-           :text "Rien à venir.")
-    (box :orientation "v" :space-evenly false
-      (for g in {venir.groupes ?: []}
-        (venir_groupe :g g)))))
+    (defil
+      (label :class "venir-vide" :halign "start" :wrap true
+             :visible {arraylength(venir.groupes ?: []) == 0}
+             :text "Rien à venir.")
+      (box :orientation "v" :space-evenly false
+        (for g in {venir.groupes ?: []}
+          (venir_groupe :g g))))))
 
 
 ;; ==========================================================================
@@ -326,13 +337,6 @@
     ;; en bas quel que soit le panneau ouvert.
     (bandeau)))
 
-;; --- Detail mail (popup au clic, a GAUCHE de la colonne) ------------------
-;; x = -36% : la colonne occupe 33% + 24px depuis le bord droit (~35%), on
-;; se place juste a sa gauche. Temporaire : le detail passera DANS la
-;; colonne a l'etape 7. (La fenetre ev_detail du detail agenda a disparu a
-;; l'etape 6, avec le panneau A VENIR.)
-(defwindow detail
-  :monitor 0
-  :geometry (geometry :x "-36%" :y "38%" :width "30%" :height "33%" :anchor "top right")
-  :stacking "bg" :windowtype "dock" :wm-ignore false
-  (detail_box))
+;; (Les popups de detail -- fenetres "detail" et "ev_detail" -- ont disparu
+;; aux etapes 6 et 7 de la refonte : la colonne est desormais la SEULE
+;; fenetre du dashboard, le detail d'un mail s'affiche dans son panneau.)

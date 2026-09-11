@@ -2,10 +2,9 @@
 
 * { all: unset; }
 
-/* preview/detail/ev_preview/ev_detail restent mappees en permanence
-   (revealer pilote l'affichage du contenu, voir eww.yuck) : sans ceci, le
-   fond par defaut de la fenetre GTK elle-meme (pas celui de ".panel") reste
-   visible en permanence, meme quand le revealer masque tout le contenu. */
+/* Fond de la fenetre GTK elle-meme transparent : seuls les panneaux et le
+   bandeau (.panel, .bandeau) portent le voile blanc ; les ecarts entre eux
+   restent transparents (et floutes par picom). */
 window { background-color: transparent; }
 
 .panel {
@@ -81,12 +80,11 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 /* --- Digest : items cliquables (survol / lu-non lu) ---------------------- */
 .item { background-color: transparent; border: none; padding: 2px 4px;  }
 .item:hover { background-color: rgba(255, 255, 255, 0.12); }
-.item.selected { background-color: rgba(255, 255, 255, 0.20); }   /* mail ouvert : highlight persistant */
 .item-subject { color: white; }
 .item-subject.nonlu { font-weight: bold; }
 .item-meta { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
 
-/* --- Digest : fenetres laterales (apercu / detail) ---------------------- */
+/* --- Digest : detail d'un mail (dans le panneau, a la place de la liste) - */
 .side-title   { font-weight: bold; margin-bottom: 6px; }
 .side-from    { font-size: 12px; color: rgba(255, 255, 255, 0.70); margin-bottom: 4px; }
 .side-badges  { font-size: 11px; color: rgba(255, 255, 255, 0.60); margin-bottom: 8px; }
@@ -94,14 +92,14 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 .side-summary { color: rgba(255, 255, 255, 0.85); margin-bottom: 8px; }
 
 .detail-head { margin-bottom: 4px; }
-.close-btn {
-  font-size: 24px;
-  font-weight: bold;
+/* bouton de retour a la liste, a gauche du sujet */
+.retour-btn {
+  font-size: 22px;
   color: white;
-  padding: 0 4px;
+  padding: 0 10px 0 0;
   background-color: transparent;
 }
-.close-btn:hover { color: #ff6b6b; }
+.retour-btn:hover { color: #8ecae6; }
 
 /* separateur intent/classification <-> contenu (summary) */
 .side-sep { min-height: 1px; background-color: rgba(255, 255, 255, 0.30); margin: 10px 0; }

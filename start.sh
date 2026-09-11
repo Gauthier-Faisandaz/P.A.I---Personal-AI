@@ -131,13 +131,11 @@ printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
 # Depuis la refonte (09/2026), tout le dashboard tient dans UNE seule
 # fenetre, "colonne" (voir eww.yuck). On ferme d'abord (sans erreur si deja
 # ferme) pour que le script soit relançable.
-"$EWW" close colonne detail 2>/dev/null
+"$EWW" close colonne 2>/dev/null
 
 "$EWW" open  colonne --screen "$TARGET"
 
-# detail n'est PAS ouverte ici : elle ne l'est qu'a la
-# demande, par ui.sh, au moment du clic (voir son commentaire) -- constate
-# le 12/08 : les garder mappees en permanence (meme avec le contenu masque
-# via :visible) laisse un fond fantome visible au repos sous ce
-# compositeur. Le TARGET est deja enregistre ci-dessus (target_screen),
-# ui.sh s'en sert pour savoir sur quel ecran les ouvrir.
+# (Jusqu'a la refonte en colonne, des fenetres de detail etaient ouvertes a
+# la demande par ui.sh. Le detail d'un mail s'affiche desormais DANS la
+# colonne : "colonne" est la seule fenetre. target_screen, enregistre
+# ci-dessus, reste utilise par eww-watchdog.sh pour la rouvrir.)
