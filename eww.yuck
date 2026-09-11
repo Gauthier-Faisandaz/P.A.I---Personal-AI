@@ -1,5 +1,5 @@
-;; ~/.config/eww/eww.yuck - Viridis Lab : digest mail + agenda (clic = detail)
-;;                                       + recommandations (verre)
+;; ~/.config/eww/eww.yuck - Viridis Lab : colonne accordeon (recommandations,
+;;                          a venir, boite de reception) + bandeau (verre)
 ;; Demarrage :  voir start.sh (ouvre toutes les fenetres sur le bon ecran)
 ;; Recharger :  eww reload
 ;;
@@ -12,8 +12,9 @@
 ;; sur cette base saine.
 ;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
-;;   - variables opened_id / ev_opened_id   -> ui.sh
-;;   - fenetres colonne detail ev_detail    -> start.sh, ui.sh,
+;;   - variables ouvert / opened_id         -> ui.sh
+;;   - variables digest recos venir         -> sync.sh
+;;   - fenetres colonne detail              -> start.sh, ui.sh,
 ;;     eww-watchdog.sh
 
 
@@ -33,7 +34,7 @@
 ;; widget perso ("can only be used as a child of some container widget") --
 ;; toujours l'envelopper dans un (box ...) cote appelant.
 ;; id     = nom du panneau dans l'accordeon (reco | venir | mail)
-;; source = argument passe a sync.sh (digest | recos | events)
+;; source = argument passe a sync.sh (digest | recos | venir)
 ;; resume = texte court affiche a droite de l'en-tete ("8 à traiter"...),
 ;;          pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
 ;; semi   = phrase affichee sous l'en-tete quand le panneau est REPLIE
@@ -212,63 +213,44 @@
 
 
 ;; ==========================================================================
-;;  AGENDA  (clic = detail ; auto-refresh 10 min)
+;;  A VENIR  (evenements agenda + taches datees ; auto-refresh 10 min)
 ;; ==========================================================================
-(defvar ev_opened_id "")
+;; Remplace l'ancien panneau AGENDA (etape 6 de la refonte). La liste arrive
+;; DEJA fusionnee, triee, groupee et resumee par n8n : voir fetch-venir.sh
+;; pour le contrat de donnees. eww ne fait qu'afficher : un groupe = un titre
+;; + ses lignes, le glyphe distingue les deux sources. Pas de detail au clic.
+(defpoll venir :interval "10m" :initial "{\"groupes\":[]}"
+  "bash ~/.config/eww/fetch-venir.sh")
 
-;; :initial inclut "by_id":{} pour la meme raison que digest ci-dessus.
-(defpoll events :interval "10m" :initial "{\"by_id\":{}}"
-  "bash ~/.config/eww/fetch-events.sh")
+;; --- Ligne : glyphe (▪ evenement, ☐ tache), titre tronque, echeance a
+;;     droite. cle = cle du groupe ("retard"...) : sert de classe CSS, pour
+;;     colorer l'echeance des elements en retard. Les champs type / titre /
+;;     quand existent toujours (completes par fetch-venir.sh).
+(defwidget venir_item [it cle]
+  (box :class "venir-item" :orientation "h" :space-evenly false
+    (label :class "venir-glyphe" :text {it.type == "event" ? "▪" : "☐"})
+    (label :class "venir-titre" :halign "start" :hexpand true :truncate true
+           :text {it.titre})
+    (label :class "venir-quand ${cle}" :halign "end" :visible {it.quand != ""}
+           :text {it.quand})))
 
-;; --- Ligne : nom a gauche (tronque), date/heure a droite ;
-;;     clic -> detail ; highlight persistant sur l'evenement ouvert --------
-(defwidget event_line [ev]
-  (eventbox :class "ev-line ${ev.id == ev_opened_id ? 'selected' : ''}"
-            :onclick "bash ~/.config/eww/ui.sh ev_open '${ev.id}'"
-    (box :orientation "h" :space-evenly false :hexpand true
-      (label :class "ev-name" :halign "start" :hexpand true :wrap false :truncate true
-             :text {ev.name_short ?: '(sans titre)'})
-      (label :class "ev-when" :halign "end" :wrap false
-             :text {ev.when ?: ''}))))
+;; --- Groupe : titre ("► EN RETARD · 1"), puis ses lignes. Les groupes vides
+;;     sont retires par fetch-venir.sh : jamais de titre orphelin ici.
+(defwidget venir_groupe [g]
+  (box :class "section" :orientation "v" :space-evenly false
+    (label :class "sect-label venir-${g.cle}" :halign "start" :text "► ${g.entete}")
+    (for it in {g.items}
+      (venir_item :it it :cle {g.cle}))))
 
-(defwidget events_box []
-  ;; id "venir" : ce panneau deviendra "À VENIR" (agenda + taches) a l'etape 6
-  (panel :id "venir" :title "AGENDA" :sync {events.sync ?: '--:--'} :source "events"
-         :resume {events.resume ?: ''} :semi ""
-    (label :class "ev-empty" :halign "start" :wrap true
-           :visible {arraylength(events.events ?: []) == 0}
-           :text "Aucun évènement à venir.")
+(defwidget venir_box []
+  (panel :id "venir" :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
+         :resume {venir.resume ?: ''} :semi ""
+    (label :class "venir-vide" :halign "start" :wrap true
+           :visible {arraylength(venir.groupes ?: []) == 0}
+           :text "Rien à venir.")
     (box :orientation "v" :space-evenly false
-      (for ev in {events.events ?: []}
-        (event_line :ev ev)))))
-
-;; --- Detail (clic, fermable) -----------------------------------------------
-;; Meme architecture (open/close reel par ui.sh) que detail_box, voir son
-;; commentaire, pilotee par ev_opened_id.
-(defwidget ev_detail_box []
-  (box :visible {ev_opened_id != ''}
-    (ev_detail_content :ev {(events.by_id ?: {})[ev_opened_id] ?: {}})))
-
-(defwidget ev_detail_content [ev]
-  (side_panel :title {ev.name ?: ''} :onclose "bash ~/.config/eww/ui.sh ev_close"
-    (label :class "side-from" :halign "start" :wrap true
-           :text {ev.range ?: ''})
-    (label :class "side-badges" :halign "start" :wrap true
-           :text "${ev.calendar ?: ''} · ${ev.status ?: ''}${(ev.allday ?: false) ? ' · journée entière' : ''}")
-    (label :class "ev-field" :halign "start" :wrap true
-           :visible {(ev.location ?: '') != ''}
-           :text "⚲ ${ev.location ?: ''}")
-    (label :class "ev-field ev-link" :halign "start" :wrap true
-           :visible {(ev.meet ?: '') != ''}
-           :text "▷ Visioconférence disponible")
-    (side_summary :text {ev.description ?: ''})
-    ;; 2 derniers = placeholders a cabler plus tard
-    (action_bar
-      (button :class "action-btn" :onclick "xdg-open '${ev.url ?: ''}'" "Ouvrir l'agenda")
-      (button :class "action-btn" :visible {(ev.meet ?: '') != ''}
-              :onclick "xdg-open '${ev.meet ?: ''}'" "Rejoindre")
-      (button :class "action-btn" "Action 3")
-      (button :class "action-btn" "Action 4"))))
+      (for g in {venir.groupes ?: []}
+        (venir_groupe :g g)))))
 
 
 ;; ==========================================================================
@@ -337,26 +319,20 @@
   ;; -> qu'est-ce qui demande une reponse.
   (box :class "colonne" :orientation "v" :space-evenly false :spacing 16
     (recos_box)
-    (events_box)
+    (venir_box)
     (digest_box)
     ;; Dernier enfant : comme la fenetre a une hauteur FIXE et que le panneau
     ;; ouvert absorbe toute la place libre (:vexpand), le bandeau reste colle
     ;; en bas quel que soit le panneau ouvert.
     (bandeau)))
 
-;; --- Details (popups au clic, a GAUCHE de la colonne) ---------------------
+;; --- Detail mail (popup au clic, a GAUCHE de la colonne) ------------------
 ;; x = -36% : la colonne occupe 33% + 24px depuis le bord droit (~35%), on
-;; se place juste a sa gauche. Temporaire : le detail mail passera DANS la
-;; colonne a l'etape 7, et ev_detail disparaitra avec le panneau A VENIR
-;; (etape 6).
+;; se place juste a sa gauche. Temporaire : le detail passera DANS la
+;; colonne a l'etape 7. (La fenetre ev_detail du detail agenda a disparu a
+;; l'etape 6, avec le panneau A VENIR.)
 (defwindow detail
   :monitor 0
   :geometry (geometry :x "-36%" :y "38%" :width "30%" :height "33%" :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
   (detail_box))
-
-(defwindow ev_detail
-  :monitor 0
-  :geometry (geometry :x "-36%" :y "56%" :width "28%" :height "40%" :anchor "top right")
-  :stacking "bg" :windowtype "dock" :wm-ignore false
-  (ev_detail_box))

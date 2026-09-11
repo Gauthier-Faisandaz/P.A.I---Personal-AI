@@ -138,17 +138,21 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 
 .reco-empty { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 
-/* --- Agenda : lignes cliquables (survol + selection) -------------------- */
-.ev-line { background-color: transparent; border: none; padding: 3px 4px; }
-.ev-line:hover { background-color: rgba(255, 255, 255, 0.12); }
-.ev-line.selected { background-color: rgba(255, 255, 255, 0.20); }  /* evenement ouvert */
-.ev-name { color: white; }
-.ev-when {
+/* --- A VENIR : lignes (glyphe, titre, echeance) ------------------------- */
+/* Les titres de groupe reutilisent .section / .sect-label de la boite de
+   reception. Le groupe "retard" (classe venir-retard) et l'echeance de ses
+   elements (classe retard) sont en rouge : c'est ce qui doit se voir. */
+.venir-item   { padding: 2px 4px; }
+.venir-glyphe { margin-right: 8px; color: rgba(255, 255, 255, 0.75); }
+.venir-titre  { color: white; }
+.venir-quand {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.70);
   margin-left: 14px;
 }
-.ev-empty { color: rgba(255, 255, 255, 0.6); font-style: italic; }
+.venir-quand.retard     { color: #ff6b6b; }
+.sect-label.venir-retard { color: #ff6b6b; }
+.venir-vide { color: rgba(255, 255, 255, 0.6); font-style: italic; }
 
 /* --- Bandeau (bas de la colonne) --------------------------------------- */
 /* Meme verre que les panneaux, mais une seule ligne de ~38px et une
@@ -180,7 +184,3 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   min-height: 6px;
   background-color: rgba(255, 255, 255, 0.85);
 }
-
-/* --- Agenda : champs de la modale de detail ---------------------------- */
-.ev-field { color: rgba(255, 255, 255, 0.88); margin-bottom: 4px; }
-.ev-link  { color: #8ecae6; }

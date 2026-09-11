@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ============================================================================
+# N'EST PLUS APPELE PAR EWW depuis l'etape 6 de la refonte (10/09) : le
+# panneau AGENDA a ete remplace par A VENIR (voir fetch-venir.sh), dont la
+# fusion agenda + taches se fait cote n8n. Conserve comme reference du
+# formatage des dates en francais et des liens Google Agenda (cal_url),
+# reutilisables dans le workflow n8n. Peut etre supprime.
+# ============================================================================
 # fetch-events.sh — evenements Google Agenda depuis n8n via ~/.netrc.
 # Trie par date de debut, tronque le nom, formate les dates en francais lisible
 # et publie un index "by_id" pour le survol (apercu) et le clic (detail).

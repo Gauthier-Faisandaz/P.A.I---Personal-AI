@@ -1,0 +1,21 @@
+{
+  "synchro": "09:55",
+  "resume": "1 en retard · 2 aujourd'hui",
+  "groupes": [
+    { "cle": "retard", "libelle": "EN RETARD", "compte": 1, "items": [
+      { "type": "tache", "titre": "Renouveler l'hébergement o2switch", "quand": "−1 j" }
+    ]},
+    { "cle": "aujourdhui", "libelle": "AUJOURD'HUI", "date": "jeu. 10", "items": [
+      { "type": "tache", "titre": "Payer la CVEC" },
+      { "type": "tache", "titre": "Répondre à V. NABET" }
+    ]},
+    { "cle": "demain", "libelle": "DEMAIN", "date": "ven. 11", "items": [
+      { "type": "event", "titre": "Réunion SFP", "quand": "14:00" }
+    ]},
+    { "cle": "semaine", "libelle": "CETTE SEMAINE", "items": [
+      { "type": "event", "titre": "Session Studeria", "quand": "lun. 10:00" },
+      { "type": "tache", "titre": "Rendre le dossier IPSSI", "quand": "mar." }
+    ]},
+    { "cle": "plus_tard", "libelle": "PLUS TARD", "items": [] }
+  ]
+}
