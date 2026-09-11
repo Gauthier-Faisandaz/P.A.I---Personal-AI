@@ -41,9 +41,11 @@
 ;; qu'il demandait, sa liste continue sous le bord (degrade + chevron).
 ;; r_* = panneau replie. C'est AUSSI le script qui les pousse, dans le meme
 ;; "eww update" que les hauteurs : le chevron, le corps qui disparait et
-;; la nouvelle hauteur changent dans le meme rendu. Ne jamais les modifier
-;; a la main avec "eww update r_..." : passer par "mise-en-page.py
-;; --basculer", sinon les hauteurs ne suivent pas.
+;; la nouvelle hauteur changent dans le meme rendu. L'etat lui-meme vit
+;; dans ~/.cache/pai/replies.json (il survit aux redemarrages) : r_* n'en
+;; est que le reflet, repousse a chaque calcul. Ne jamais les modifier a
+;; la main avec "eww update r_..." (les hauteurs ne suivraient pas, et le
+;; calcul suivant l'effacerait) : passer par "mise-en-page.py --basculer".
 (defvar h_reco 0)
 (defvar h_venir 0)
 (defvar h_mail 0)

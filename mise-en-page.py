@@ -30,26 +30,36 @@ Usage :
                            replie ce panneau s'il est ouvert, le deplie
                            sinon, puis pousse comme --pousser. Lance par un
                            clic sur l'en-tete du panneau (eww.yuck).
+                           L'etat est garde dans ~/.cache/pai/replies.json :
+                           il survit aux redemarrages d'eww et du PC.
   mise-en-page.py test     verifie l'algorithme sur le tableau de reference
                            du brief v9 (section 3), plus des invariants.
   mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 [--replies reco]
                            meme calcul sur des donnees inventees.
 """
 import argparse
+import contextlib
 import dataclasses
 import fcntl
+import io
 import json
 import math
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import textwrap
 from dataclasses import dataclass
 
 EWW = os.path.expanduser("~/.cargo/bin/eww")
 CACHE = os.path.expanduser("~/.cache/eww")
 BUS = os.path.join(CACHE, "bus")          # rempli par publier.sh
+# Etat de repli : une PREFERENCE d'affichage, gardee sur disque pour
+# survivre aux redemarrages (les variables eww repartent de zero a chaque
+# lancement du demon). Dossier a part, ~/.cache/pai, et non le bus : c'est
+# un etat d'INTERFACE, ecrit par ce script seul, jamais lu par n8n.
+REPLIES = os.path.expanduser("~/.cache/pai/replies.json")
 # RUST_LOG=error : le demon est lance avec RUST_LOG=debug (start.sh) et le
 # transmet aux scripts qu'il lance ; sans ca, chaque appel a eww noierait
 # mise-en-page.log sous ses messages de debogage.
@@ -374,22 +384,44 @@ def lire_tout_le_bus():
     return {p.bus: lire_bus(p.bus) for p in PANNEAUX}
 
 
-def lire_replies():
-    """Panneaux replies en ce moment = variables r_* du demon eww, que ce
-    script y a poussees au dernier calcul. Pour l'instant l'etat ne vit que
-    la : il repart "tout ouvert" a chaque redemarrage d'eww (la persistance
-    sur disque est l'etape 3). Demon injoignable ou variable absente :
-    panneau compte ouvert, c'est le defaut."""
-    replies = set()
-    for v in VARS:
-        try:
-            r = subprocess.run([EWW, "get", f"r_{v}"], capture_output=True,
-                               text=True, timeout=2, env=ENV_EWW)
-        except subprocess.TimeoutExpired:
-            continue
-        if r.returncode == 0 and r.stdout.strip() == "true":
-            replies.add(v)
-    return frozenset(replies)
+def lire_replies(chemin=REPLIES):
+    """Panneaux replies, lus dans le fichier d'etat : {"replies": ["reco"]}.
+
+    C'est la SEULE source de verite. Les variables r_* d'eww n'en sont que
+    le reflet, repousse a chaque calcul : c'est ce qui restaure l'etat au
+    demarrage, sans rien ajouter a start.sh (ouvrir-colonne.sh lance un
+    calcul juste apres avoir ouvert la colonne, eww-watchdog.sh aussi).
+
+    Fichier absent (jamais rien replie) : tout ouvert. Fichier abime : tout
+    ouvert aussi, avec un message dans mise-en-page.log -- le defaut, sans
+    risque, plutot qu'une colonne qui ne s'affiche plus. Un nom inconnu
+    (panneau renomme ou supprime) est ignore."""
+    try:
+        with open(chemin) as f:
+            donnees = json.load(f)
+        noms = donnees.get("replies") if isinstance(donnees, dict) else None
+        if not isinstance(noms, list):
+            raise ValueError('pas de liste "replies"')
+    except FileNotFoundError:
+        return frozenset()
+    except (OSError, ValueError) as e:      # ValueError couvre le JSON invalide
+        print(f"{chemin} illisible ({e}) : tout ouvert", file=sys.stderr)
+        return frozenset()
+    return frozenset(n for n in noms if n in VARS)
+
+
+def ecrire_replies(replies, chemin=REPLIES):
+    """Ecrit le fichier d'etat. Fichier temporaire puis os.replace
+    (instantane, comme le "mv" de publier.sh) : une lecture ne tombe jamais
+    sur un fichier a moitie ecrit, meme si le PC s'eteint pendant
+    l'ecriture. Les noms sont ranges dans l'ordre des panneaux, pour que le
+    fichier reste lisible a l'oeil."""
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
+    tmp = chemin + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"replies": [v for v in VARS if v in replies]}, f)
+        f.write("\n")
+    os.replace(tmp, chemin)
 
 
 def factices(recos=0, venir=0, groupes=4, mails=0, sections=1):
@@ -440,6 +472,9 @@ def mettre_a_jour(basculer=None):
         replies = lire_replies()
         if basculer:
             replies ^= {basculer}          # ^ = ajoute s'il manque, retire sinon
+            # Ecrit AVANT de pousser : si eww ne repond pas, l'etat est quand
+            # meme garde, et le prochain calcul l'appliquera.
+            ecrire_replies(replies)
         h_col, largeur, marge, _ = geometrie()
         res = calculer(lire_tout_le_bus(), REELLES, h_col, largeur, marge, replies)
         pousser(res)
@@ -582,6 +617,32 @@ def test():
     print(f"  jamais sous le plancher ({REELLES.plancher} px), personne n'est tronqué quand")
     print("  tout tient, y cohérents, replier ne rétrécit jamais un autre panneau.")
     print(f"  Tous vides, écran 1080 : {vides} -> {'parts égales' if parts else 'ÉCHEC'}")
+
+    print("\n4) Fichier d'état des repliés (dans un dossier temporaire, jamais le vrai)\n")
+    with tempfile.TemporaryDirectory() as d:
+        chemin = os.path.join(d, "pai", "replies.json")   # dossier pai absent : a creer
+        verifs = [("fichier absent -> tout ouvert", lire_replies(chemin) == frozenset())]
+        ecrire_replies(frozenset({"mail", "reco"}), chemin)
+        verifs.append(("écrit puis relu (dossier créé)", lire_replies(chemin) == {"reco", "mail"}))
+        with open(chemin) as f:
+            verifs.append(("rangé dans l'ordre des panneaux",
+                           json.load(f) == {"replies": ["reco", "mail"]}))
+        verifs.append(("pas de fichier temporaire oublié", not os.path.exists(chemin + ".tmp")))
+        ecrire_replies(frozenset(), chemin)
+        verifs.append(("tout rouvert -> liste vide", lire_replies(chemin) == frozenset()))
+        with open(chemin, "w") as f:
+            f.write('{"replies": ["reco", "inconnu"]}')
+        verifs.append(("nom inconnu ignoré", lire_replies(chemin) == {"reco"}))
+        for nom, contenu in (("JSON abîmé -> tout ouvert", "{pas du json"),
+                             ("mauvaise forme -> tout ouvert", '["reco"]')):
+            with open(chemin, "w") as f:
+                f.write(contenu)
+            # le message "illisible" est attendu ici : on le fait taire
+            with contextlib.redirect_stderr(io.StringIO()):
+                verifs.append((nom, lire_replies(chemin) == frozenset()))
+    for nom, bon in verifs:
+        ok &= bon
+        print(f"  {nom:40}{'OK' if bon else 'ÉCHEC'}")
     print("\nRÉSULTAT :", "tout est OK" if ok else "ÉCHEC")
     return ok
 
