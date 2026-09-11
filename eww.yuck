@@ -14,9 +14,15 @@
 ;; dashboard doit montrer d'un coup d'oeil. Les trois panneaux sont
 ;; desormais toujours visibles. Version accordeon : branche refonte-colonne.
 ;;
+;; NOTE (repli des panneaux) : un clic sur l'en-tete d'un panneau le REPLIE
+;; (il ne garde que son en-tete et son compteur) pour donner sa place aux
+;; autres ; nouveau clic, il se rouvre. Ce n'est PAS l'accordeon : le
+;; defaut reste "tout ouvert", plusieurs panneaux (ou tous) peuvent etre
+;; replies, et rien n'oblige a cliquer pour lire.
+;;
 ;; Noms a ne pas renommer sans mettre a jour les scripts :
 ;;   - variables digest recos venir         -> sync.sh
-;;   - variables h_* y_* t_*                -> mise-en-page.py
+;;   - variables h_* y_* t_* r_*            -> mise-en-page.py
 ;;   - variable mail_modale, y_mail         -> ui.sh
 ;;   - fenetre colonne                      -> ouvrir-colonne.sh
 ;;   - fenetre modale                       -> ui.sh, ouvrir-colonne.sh
@@ -28,11 +34,16 @@
 
 ;; --- Hauteur de chaque panneau et position de son bord haut (px) ---------
 ;; Calculees par mise-en-page.py, envoyees en UN seul "eww update" apres
-;; chaque arrivee de donnees (voir publier.sh). Les y_* ne servent pas
-;; encore : la modale mail (etape 5) s'alignera sur y_mail.
+;; chaque arrivee de donnees (voir publier.sh) et a chaque repli. y_mail
+;; sert a aligner la modale mail (ui.sh).
 ;; 0 = pas encore calcule (voir le widget panel ci-dessous).
 ;; t_* = panneau tronque : le script n'a pas pu lui donner toute la hauteur
 ;; qu'il demandait, sa liste continue sous le bord (degrade + chevron).
+;; r_* = panneau replie. C'est AUSSI le script qui les pousse, dans le meme
+;; "eww update" que les hauteurs : le chevron, le corps qui disparait et
+;; la nouvelle hauteur changent dans le meme rendu. Ne jamais les modifier
+;; a la main avec "eww update r_..." : passer par "mise-en-page.py
+;; --basculer", sinon les hauteurs ne suivent pas.
 (defvar h_reco 0)
 (defvar h_venir 0)
 (defvar h_mail 0)
@@ -42,55 +53,76 @@
 (defvar t_reco false)
 (defvar t_venir false)
 (defvar t_mail false)
+(defvar r_reco false)
+(defvar r_venir false)
+(defvar r_mail false)
 
-;; --- Panneau principal : en-tete (titre, resume, bouton ↻), puis le corps
-;;     (separateur + zone de defilement) ---------------------------------
+;; --- Panneau principal : en-tete (chevron, titre, resume, bouton ↻), puis
+;;     le corps (separateur + zone de defilement) ------------------------
 ;; Attention : eww refuse un (for ...) passe directement en enfant d'un
 ;; widget perso ("can only be used as a child of some container widget") --
 ;; toujours l'envelopper dans un (box ...) cote appelant.
-;; source = argument passe a sync.sh (digest | recos | venir)
-;; sync   = heure de la derniere synchro, affichee en infobulle du bouton ↻
-;; resume = texte court affiche a droite de l'en-tete ("8 à traiter"...),
-;;          pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
-;;
+;; source  = argument passe a sync.sh (digest | recos | venir)
+;; sync    = heure de la derniere synchro, affichee en infobulle du bouton ↻
+;; resume  = texte court affiche a droite de l'en-tete ("8 à traiter"...),
+;;           pre-calcule par le script fetch-*.sh (champ "resume" du JSON)
 ;; hauteur = hauteur TOTALE du panneau en px, bordures comprises (h_reco...)
+;; tronque = t_reco... : affiche le chevron et le degrade de coupe.
+;; panneau = nom du panneau pour mise-en-page.py (reco | venir | mail)
+;; replie  = r_reco... : en-tete seul, corps masque.
 ;;
 ;; Hauteurs : c'est mise-en-page.py qui les decide (repartition elastique),
-;; eww ne fait que les appliquer avec :height. Les trois hauteurs + le
-;; bandeau + les ecarts font exactement la hauteur de la fenetre : GTK n'a
-;; plus de place libre a distribuer. :vexpand reste la comme filet : tant
-;; que les hauteurs valent 0 (avant le premier calcul), GTK partage la
-;; place en tiers, comme a l'etape 0, au lieu de tout tasser en haut.
-;; Le corps est un scroll : ce qui ne tient pas dans la hauteur defile.
-;; tronque = t_reco... : affiche le chevron et le degrade de coupe.
-(defwidget panel [title sync source resume hauteur tronque]
-  (box :class "panel" :orientation "v" :space-evenly false :vexpand true
-       :height hauteur
-    ;; En-tete : plus cliquable (plus d'accordeon), c'est une simple box.
-    (box :class "header" :orientation "h" :space-evenly false
-      (label :class "title" :halign "start" :hexpand true :text title)
-      (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
-      ;; Chevron de coupe, colle au compteur : "il y en a plus que ce qui
-      ;; se voit". Le degrade en bas du corps dit OU ca continue.
-      (label :class "coupe" :visible tronque :text "▼"
-             :tooltip "la liste continue : faire défiler")
-      ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
-      ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
-      ;; de la colonne (c'est pour ca que l'accordeon ne la montrait que sur
-      ;; le panneau deplie).
-      ;; :timeout "15s" : eww TUE une commande onclick au bout de son
-      ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
-      ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
-      ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
-      ;; d'avoir mis a jour le panneau.
-      (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
-              :onclick "bash ~/.config/eww/sync.sh ${source}" "↻"))
-    (box :class "sep")
+;; eww ne fait que les appliquer avec :height. Le corps est un scroll : ce
+;; qui ne tient pas dans la hauteur defile.
+;; :vexpand {hauteur == 0} : filet de securite, seulement tant que les
+;; hauteurs valent 0 (avant le premier calcul) -- GTK partage alors la
+;; place en tiers au lieu de tout tasser en haut. Une fois les hauteurs
+;; calculees, un panneau ne doit PLUS s'etirer : quand tout est replie, la
+;; place libre doit rester vide (fond d'ecran), pas regonfler les en-tetes.
+(defwidget panel [title sync source resume hauteur tronque panneau replie]
+  (box :class "panel ${replie ? 'replie' : ''}" :orientation "v" :space-evenly false
+       :vexpand {hauteur == 0} :height hauteur
+    ;; En-tete CLIQUABLE (eventbox) : replie / deplie le panneau.
+    ;; mise-en-page.py --basculer relit l'etat, bascule CE panneau,
+    ;; recalcule toutes les hauteurs et pousse le tout en un seul update.
+    ;; :timeout "5s" : eww TUE une commande onclick au bout de 200ms par
+    ;; defaut (voir le bouton ↻) ; le calcul prend ~0.1s, marge confortable.
+    ;; Le bouton ↻ reste dans l'en-tete : un clic dessus est pris par le
+    ;; bouton (GTK), il synchronise sans replier.
+    (eventbox :class "entete-clic" :cursor "pointer" :timeout "5s"
+              :tooltip {replie ? "déplier" : "replier (donne la place aux autres)"}
+              :onclick "python3 ~/.config/eww/mise-en-page.py --basculer ${panneau} > ~/.cache/eww/mise-en-page.log 2>&1"
+      (box :class "header" :orientation "h" :space-evenly false
+        ;; Chevron de repli, a gauche du titre : ▾ ouvert, ▸ replie.
+        (label :class "chevron" :text {replie ? "▸" : "▾"})
+        (label :class "title" :halign "start" :hexpand true :text title)
+        ;; Le compteur reste affiche une fois replie : on perd la liste,
+        ;; jamais l'information qu'il y a quelque chose.
+        (label :class "resume" :halign "end" :visible {resume != ''} :text resume)
+        ;; Chevron de coupe, colle au compteur : "il y en a plus que ce qui
+        ;; se voit". Le degrade en bas du corps dit OU ca continue. Jamais
+        ;; sur un panneau replie (le script met alors t_* a false).
+        (label :class "coupe" :visible tronque :text "▼"
+               :tooltip "la liste continue : faire défiler")
+        ;; L'heure de synchro passe en infobulle du bouton ↻ : l'afficher en
+        ;; clair sur les TROIS en-tetes a la fois ne tient pas dans la largeur
+        ;; de la colonne.
+        ;; :timeout "15s" : eww TUE une commande onclick au bout de son
+        ;; timeout, 200ms par defaut (verifie dans le source 0.6.0,
+        ;; run_command -> child.kill()). sync.sh fait un curl vers n8n
+        ;; (>= 0.45s, --max-time 8) : sans ce timeout, il etait tue avant
+        ;; d'avoir mis a jour le panneau.
+        ;; Il fixe aussi la hauteur de l'en-tete (29px), donc celle d'un
+        ;; panneau replie (HAUTEUR_ENTETE) : ne pas le masquer au repli.
+        (button :class "sync-icon" :timeout "15s" :tooltip "sync ${sync}"
+                :onclick "bash ~/.config/eww/sync.sh ${source}" "↻")))
+    ;; Corps : separateur + liste, masques quand le panneau est replie.
+    (box :class "sep" :visible {!replie})
     ;; overlay : le 1er enfant (le scroll) donne la taille, les suivants
     ;; sont poses PAR-DESSUS. Le scroll (vertical seulement) absorbe le
     ;; contenu qui depasse ; les labels non wrappes ont :truncate true pour
     ;; ne pas elargir la fenetre.
-    (overlay :vexpand true
+    (overlay :vexpand true :visible {!replie}
       (scroll :class "sections" :vscroll true :hscroll false :vexpand true
         (box :orientation "v" :space-evenly false
           (children)))
@@ -122,6 +154,7 @@
 (defwidget recos_box []
   (panel :title "RECOMMANDATIONS" :sync {recos.sync ?: '--:--'} :source "recos"
          :resume {recos.resume ?: ''} :hauteur h_reco :tronque t_reco
+         :panneau "reco" :replie r_reco
     (label :class "reco-empty" :halign "start" :wrap true
            :visible {arraylength(recos.recommandations ?: []) == 0}
            :text "Aucune recommandation pour le moment.")
@@ -163,6 +196,7 @@
 (defwidget venir_box []
   (panel :title "À VENIR" :sync {venir.synchro ?: '--:--'} :source "venir"
          :resume {venir.resume ?: ''} :hauteur h_venir :tronque t_venir
+         :panneau "venir" :replie r_venir
     (label :class "venir-vide" :halign "start" :wrap true
            :visible {arraylength(venir.groupes ?: []) == 0}
            :text "Rien à venir.")
@@ -177,8 +211,8 @@
 ;; :initial inclut "by_id":{} : sans ca, digest.by_id vaut null tant que
 ;; fetch-digest.sh n'a pas rendu son premier resultat, et indexer [id]
 ;; dessus plante le rendu du widget entier ("Unable to index into value
-;; null" dans eww-daemon.out.log) -- constate en prod le 12/08. by_id n'est
-;; plus lu depuis l'etape 0 ; il le sera de nouveau par la modale (etape 5).
+;; null" dans eww-daemon.out.log) -- constate en prod le 12/08. by_id est
+;; lu par la modale (modale_box, plus bas).
 (defpoll digest :interval "5m" :initial "{\"by_id\":{}}"
   "bash ~/.config/eww/fetch-digest.sh")
 
@@ -215,6 +249,7 @@
 (defwidget digest_box []
   (panel :title "BOÎTE DE RÉCEPTION" :sync {digest.sync ?: '--:--'} :source "digest"
          :resume {digest.resume ?: ''} :hauteur h_mail :tronque t_mail
+         :panneau "mail" :replie r_mail
     (label :class "mail-vide" :halign "start" :wrap true
            :visible {arraylength(digest.sections ?: []) == 0}
            :text "Aucun mail.")
@@ -361,21 +396,30 @@
 ;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
 ;; le voile blanc ni la bordure des panneaux.
 ;;
-;; !! L'ecart (:spacing 16) et la largeur (:width "33%") sont DOUBLES dans
-;; mise-en-page.py (ECART, LARGEUR_PCT) : a modifier aux deux endroits.
+;; !! L'ecart (:spacing 16, sur les DEUX box ci-dessous) et la largeur
+;; (:width "33%") sont DOUBLES dans mise-en-page.py (ECART, LARGEUR_PCT) :
+;; a modifier aux deux endroits.
 (defwindow colonne [marge hauteur droite]
   :monitor 0
   :geometry (geometry :x droite :y marge :width "33%" :height hauteur :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  ;; Ordre : qu'est-ce que je fais maintenant -> qu'est-ce qui est engage
-  ;; -> qu'est-ce qui demande une reponse.
+  ;; Deux niveaux de box, pour le repli :
+  ;;  - "panneaux" (:vexpand true) prend toute la hauteur au-dessus du
+  ;;    bandeau. Ses panneaux ont les hauteurs de mise-en-page.py, qui la
+  ;;    remplissent exactement... sauf quand TOUT est replie : les en-tetes
+  ;;    restent alors empiles en haut, et le vide en dessous laisse voir le
+  ;;    fond d'ecran (mode bureau calme).
+  ;;  - le bandeau, dernier enfant de "colonne", reste donc colle en bas
+  ;;    dans tous les cas.
+  ;; Les ecarts ne changent pas : 2 entre les panneaux + 1 entre "panneaux"
+  ;; et le bandeau = 3, comme avant (n x ECART dans mise-en-page.py).
   (box :class "colonne" :orientation "v" :space-evenly false :spacing 16
-    (recos_box)
-    (venir_box)
-    (digest_box)
-    ;; Dernier enfant : la fenetre a une hauteur FIXE, et les hauteurs des
-    ;; trois panneaux (mise-en-page.py) remplissent exactement le reste :
-    ;; le bandeau garde sa hauteur naturelle et reste colle en bas.
+    ;; Ordre : qu'est-ce que je fais maintenant -> qu'est-ce qui est engage
+    ;; -> qu'est-ce qui demande une reponse.
+    (box :class "panneaux" :orientation "v" :space-evenly false :spacing 16 :vexpand true
+      (recos_box)
+      (venir_box)
+      (digest_box))
     (bandeau)))
 
 ;; --- Modale mail : fenetre SEPAREE, meme couche que la colonne (bg/dock :

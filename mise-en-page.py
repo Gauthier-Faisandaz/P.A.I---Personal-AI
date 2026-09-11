@@ -4,10 +4,11 @@ mise-en-page.py - calcule la hauteur de chaque panneau de la colonne eww
 (recommandations, a venir, boite de reception) et la position verticale
 (y) de leur bord haut.
 
-Un panneau peut etre REPLIE : il ne garde que son en-tete (HAUTEUR_ENTETE)
-et sort du partage ; les panneaux ouverts se repartissent la place avec
-exactement le meme algorithme qu'avant, applique a eux seuls. Le defaut
-reste "tout ouvert" : le repli est une exception, pas un accordeon.
+Un panneau peut etre REPLIE (clic sur son en-tete) : il ne garde que son
+en-tete (HAUTEUR_ENTETE) et sort du partage ; les panneaux ouverts se
+repartissent la place avec exactement le meme algorithme qu'avant,
+applique a eux seuls. Le defaut reste "tout ouvert" : le repli est une
+exception, pas un accordeon.
 
 Pourquoi un script : eww ne sait pas dire ou GTK a place un widget a
 l'ecran. En calculant nous-memes les hauteurs, on connait aussi les y, et
@@ -15,18 +16,20 @@ la modale peut s'aligner sur le haut de son panneau.
 
 Usage :
   mise-en-page.py          lit les donnees actuelles des panneaux (le bus :
-                           ~/.cache/eww/bus/*.json) et affiche le resultat,
-                           sans rien envoyer a eww.
+                           ~/.cache/eww/bus/*.json) et l'etat de repli
+                           actuel, affiche le resultat, sans rien envoyer.
   mise-en-page.py --replies reco,venir
-                           meme chose, en supposant ces panneaux replies
-                           (noms : reco, venir, mail).
+                           meme chose, en supposant CES panneaux replies
+                           (noms : reco, venir, mail ; "" = aucun).
   mise-en-page.py --pousser
                            meme calcul, puis envoie a eww les hauteurs
-                           (h_reco h_venir h_mail), les positions (y_*) et
-                           les indicateurs de coupe (t_* : true/false).
-                           Lance par publier.sh apres chaque fetch-*.sh.
-                           Pour l'instant, rien n'y est replie (l'etat de
-                           repli sera branche aux etapes 2 et 3).
+                           (h_*), les positions (y_*), les indicateurs de
+                           coupe (t_*) et de repli (r_*). Lance par
+                           publier.sh apres chaque fetch-*.sh.
+  mise-en-page.py --basculer reco
+                           replie ce panneau s'il est ouvert, le deplie
+                           sinon, puis pousse comme --pousser. Lance par un
+                           clic sur l'en-tete du panneau (eww.yuck).
   mise-en-page.py test     verifie l'algorithme sur le tableau de reference
                            du brief v9 (section 3), plus des invariants.
   mise-en-page.py simuler --recos 3 --venir 7 --groupes 4 --mails 9 [--replies reco]
@@ -47,6 +50,10 @@ from dataclasses import dataclass
 EWW = os.path.expanduser("~/.cargo/bin/eww")
 CACHE = os.path.expanduser("~/.cache/eww")
 BUS = os.path.join(CACHE, "bus")          # rempli par publier.sh
+# RUST_LOG=error : le demon est lance avec RUST_LOG=debug (start.sh) et le
+# transmet aux scripts qu'il lance ; sans ca, chaque appel a eww noierait
+# mise-en-page.log sous ses messages de debogage.
+ENV_EWW = {**os.environ, "RUST_LOG": "error"}
 
 
 # ==========================================================================
@@ -77,9 +84,9 @@ SEPARATEUR = 6 + 1 + 12               # $sep-haut + trait + $sep-bas
 HABILLAGE = 2 * BORDURE + 2 * PANNEAU_PAD_V + ENTETE + SEPARATEUR   # 82
 
 # Panneau REPLIE : son cadre et son en-tete, rien d'autre. Sans la marge
-# sous l'en-tete ($entete-marge) : il n'y a plus rien dessous. Le style du
-# panneau replie (etape 2) devra donc la retirer, sinon il ferait 63 px et
-# non 59 -- et reporter cette valeur dans eww.scss (regle d'or n°6).
+# sous l'en-tete ($entete-marge) : il n'y a plus rien dessous, et eww.scss
+# la retire (regle ".panel.replie .header"). Reporte dans eww.scss (bloc
+# CONSTANTES, "panneau replie").
 HAUTEUR_ENTETE = 2 * BORDURE + 2 * PANNEAU_PAD_V + LIGNE_24         # 59
 
 SECTION_MARGE = 12     # $section-marge, sous chaque groupe SAUF le dernier
@@ -91,7 +98,7 @@ RECO_PUCE = CHASSE_12 + 8             # le "●" + $reco-puce-marge
 RECO_RETRAIT = 18      # $reco-detail-retrait
 
 BANDEAU = 38 + 2 * BORDURE            # $bandeau-haut + bordures
-ECART = 16             # :spacing de la box "colonne" (eww.yuck)
+ECART = 16             # :spacing des box "colonne" et "panneaux" (eww.yuck)
 LARGEUR_PCT = 33       # :width "33%" de la fenetre colonne (eww.yuck)
 
 
@@ -281,7 +288,7 @@ def besoin_mails(digest, c, largeur):
 # une ligne de plus dans cette table (+ eww.yuck et publier.sh).
 @dataclass(frozen=True)
 class Panneau:
-    var: str          # suffixe des variables eww : h_<var>, y_<var>, t_<var>
+    var: str          # suffixe des variables eww : h_ y_ t_ r_<var>
     nom: str          # pour l'affichage
     bus: str          # fichier du bus : ~/.cache/eww/bus/<bus>.json
     besoin: object    # fonction (donnees, constantes, largeur) -> px
@@ -303,8 +310,8 @@ def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset()):
     donnees = {nom du bus: JSON} ; replies = ensemble de noms de PANNEAUX
     (VARS) replies."""
     n = len(PANNEAUX)
-    # n panneaux + le bandeau = n+1 enfants dans la box colonne, donc n
-    # ecarts entre eux.
+    # n panneaux + le bandeau, separes par n ecarts (voir la fenetre
+    # colonne dans eww.yuck).
     A = hauteur_colonne - BANDEAU - n * ECART
     besoins = [p.besoin(donnees.get(p.bus) or {}, c, largeur) for p in PANNEAUX]
     replie = [p.var in replies for p in PANNEAUX]
@@ -325,7 +332,7 @@ def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset()):
 
 
 # ==========================================================================
-#  ENTREES : geometrie de l'ecran, donnees des panneaux
+#  ENTREES : geometrie de l'ecran, donnees des panneaux, etat de repli
 # ==========================================================================
 def geometrie():
     """(hauteur_colonne, largeur_colonne, marge, nom_ecran), lus la ou
@@ -367,6 +374,24 @@ def lire_tout_le_bus():
     return {p.bus: lire_bus(p.bus) for p in PANNEAUX}
 
 
+def lire_replies():
+    """Panneaux replies en ce moment = variables r_* du demon eww, que ce
+    script y a poussees au dernier calcul. Pour l'instant l'etat ne vit que
+    la : il repart "tout ouvert" a chaque redemarrage d'eww (la persistance
+    sur disque est l'etape 3). Demon injoignable ou variable absente :
+    panneau compte ouvert, c'est le defaut."""
+    replies = set()
+    for v in VARS:
+        try:
+            r = subprocess.run([EWW, "get", f"r_{v}"], capture_output=True,
+                               text=True, timeout=2, env=ENV_EWW)
+        except subprocess.TimeoutExpired:
+            continue
+        if r.returncode == 0 and r.stdout.strip() == "true":
+            replies.add(v)
+    return frozenset(replies)
+
+
 def factices(recos=0, venir=0, groupes=4, mails=0, sections=1):
     """Donnees inventees au format des fetch-*.sh : titres courts (une
     ligne), mails avec leur ligne "expediteur · age"."""
@@ -384,21 +409,41 @@ def factices(recos=0, venir=0, groupes=4, mails=0, sections=1):
 #  SORTIES
 # ==========================================================================
 def affectations(res):
-    """["h_reco=128", ..., "t_mail=false"] : les variables pour eww."""
+    """["h_reco=128", ..., "r_mail=false"] : les variables pour eww."""
     return ([f"h_{v}={x}" for v, x in zip(VARS, res["h"])] +
             [f"y_{v}={x}" for v, x in zip(VARS, res["y"])] +
-            [f"t_{v}={'true' if t else 'false'}" for v, t in zip(VARS, res["tronque"])])
+            [f"t_{v}={'true' if t else 'false'}" for v, t in zip(VARS, res["tronque"])] +
+            [f"r_{v}={'true' if r else 'false'}" for v, r in zip(VARS, res["replie"])])
 
 
 def pousser(res):
-    """UN seul "eww update" pour toutes les variables : les panneaux
-    changent de taille (et de signal de coupe) dans le meme rendu, sans
-    etat intermediaire ou la colonne serait trop haute ou trop courte."""
-    # RUST_LOG=error : le demon est lance avec RUST_LOG=debug (start.sh) et
-    # le transmet aux scripts qu'il lance ; sans ca, ce "eww update" noierait
-    # mise-en-page.log sous ses messages de debogage.
+    """UN seul "eww update" pour toutes les variables : au repli, le
+    chevron, le corps qui disparait et les nouvelles hauteurs arrivent dans
+    le meme rendu, sans etat intermediaire ou la colonne serait trop haute
+    ou trop courte."""
     subprocess.run([EWW, "update", *affectations(res)], timeout=5, check=False,
-                   env={**os.environ, "RUST_LOG": "error"})
+                   env=ENV_EWW)
+
+
+def mettre_a_jour(basculer=None):
+    """--pousser (basculer=None) et --basculer <var> : relit tout, bascule
+    eventuellement un panneau, recalcule, pousse.
+
+    Tout se fait sous verrou. Au demarrage, les fetch finissent presque en
+    meme temps et lancent chacun un calcul ; un clic sur un en-tete peut
+    aussi tomber pendant un calcul. Le verrou les fait passer l'un APRES
+    l'autre : chacun relit le bus ET l'etat de repli une fois son tour
+    venu, donc aucun ne pousse un etat perime par-dessus celui d'un autre
+    (deux clics rapides replient puis deplient, sans s'annuler au hasard)."""
+    with open(os.path.join(CACHE, "mise-en-page.lock"), "w") as verrou:
+        fcntl.flock(verrou, fcntl.LOCK_EX)
+        replies = lire_replies()
+        if basculer:
+            replies ^= {basculer}          # ^ = ajoute s'il manque, retire sinon
+        h_col, largeur, marge, _ = geometrie()
+        res = calculer(lire_tout_le_bus(), REELLES, h_col, largeur, marge, replies)
+        pousser(res)
+        print(" ".join(affectations(res)))      # -> mise-en-page.log
 
 
 def afficher(res):
@@ -560,44 +605,41 @@ def main():
     p.add_argument("--groupes", type=int, default=4, help="répartis en N groupes")
     p.add_argument("--mails", type=int, default=0)
     p.add_argument("--sections", type=int, default=1, help="mails répartis en N sections")
-    p.add_argument("--replies", type=liste_replies, default=frozenset(),
-                   help=f"panneaux repliés, séparés par des virgules ({', '.join(VARS)})")
+    p.add_argument("--replies", type=liste_replies, default=None,
+                   help=f"panneaux supposés repliés, séparés par des virgules "
+                        f"({', '.join(VARS)}) ; sans cette option : l'état actuel "
+                        f"(affichage) ou aucun (simuler)")
     p.add_argument("--pousser", action="store_true",
                    help="envoyer le résultat à eww (utilisé par publier.sh)")
+    p.add_argument("--basculer", choices=VARS,
+                   help="replier ce panneau s'il est ouvert, le déplier sinon, "
+                        "puis pousser (clic sur un en-tête)")
     a = p.parse_args()
 
     if a.mode == "test":
         sys.exit(0 if test() else 1)
 
-    if a.pousser:
-        # Etape 1 : le repli n'est pas encore branche sur eww. Refuser
-        # plutot que pousser des hauteurs que le yuck ne sait pas afficher.
-        if a.replies:
-            p.error("--replies ne se combine pas encore avec --pousser (étapes 2-3)")
-        # Au demarrage, les fetch finissent presque en meme temps et lancent
-        # chacun un calcul. Le verrou les fait passer l'un APRES l'autre :
-        # chacun relit le bus une fois son tour venu, donc le dernier a
-        # passer voit forcement tous les fichiers a jour -- et c'est lui qui
-        # ecrit en dernier dans eww.
-        with open(os.path.join(CACHE, "mise-en-page.lock"), "w") as verrou:
-            fcntl.flock(verrou, fcntl.LOCK_EX)
-            h_col, largeur, marge, _ = geometrie()
-            res = calculer(lire_tout_le_bus(), REELLES, h_col, largeur, marge)
-            pousser(res)
-            print(" ".join(affectations(res)))      # -> mise-en-page.log
+    if a.pousser or a.basculer:
+        # --replies ne fait que SUPPOSER un etat, pour regarder : il ne doit
+        # jamais partir dans eww. Pour replier pour de vrai : --basculer.
+        if a.replies is not None:
+            p.error("--replies sert à simuler ; pour replier pour de vrai : --basculer")
+        mettre_a_jour(a.basculer)
         return
 
     h_col, largeur, marge, ecran = geometrie()
     if a.mode == "simuler":
         donnees = factices(a.recos, a.venir, a.groupes, a.mails, a.sections)
+        replies = a.replies or frozenset()
         origine = "données simulées"
     else:
         donnees = lire_tout_le_bus()
+        replies = lire_replies() if a.replies is None else a.replies
         origine = "données actuelles des panneaux"
-    res = calculer(donnees, REELLES, h_col, largeur, marge, a.replies)
-    replies = f", repliés : {', '.join(v for v in VARS if v in a.replies)}" if a.replies else ""
+    res = calculer(donnees, REELLES, h_col, largeur, marge, replies)
+    texte = f", repliés : {', '.join(v for v in VARS if v in replies)}" if replies else ""
     print(f"Écran {ecran} : colonne {largeur} x {h_col} px, marge {marge} px, "
-          f"A = {res['A']} px — {origine}{replies}\n")
+          f"A = {res['A']} px — {origine}{texte}\n")
     afficher(res)
 
 

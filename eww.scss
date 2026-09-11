@@ -16,7 +16,11 @@
    sont dans eww.yuck, eux aussi doubles dans le script.
 
    Hauteur d'une ligne de texte (DejaVu Sans Mono, mesuree avec Pango) :
-   15px -> 18px, 13px -> 17px, 12px -> 15px, 24px -> 29px. */
+   15px -> 18px, 13px -> 17px, 12px -> 15px, 24px -> 29px.
+
+   Panneau replie (HAUTEUR_ENTETE dans le script) = 59px :
+   2 x $bordure + 2 x $panneau-pad-v + ligne de $police-sync (29px),
+   SANS $entete-marge (retiree par ".panel.replie .header", plus bas). */
 $police:              15px;  /* corps du texte                          */
 $police-petite:       13px;  /* detail d'une recommandation             */
 $police-meta:         12px;  /* 2e ligne d'un mail (expediteur, age)    */
@@ -26,7 +30,7 @@ $police-sync:         24px;  /* bouton de synchro : fixe la hauteur de
 $bordure:             1px;
 $panneau-pad-v:       14px;  /* haut et bas d'un panneau                */
 $panneau-pad-h:       18px;  /* gauche et droite                        */
-$entete-marge:        4px;   /* sous l'en-tete                          */
+$entete-marge:        4px;   /* sous l'en-tete (panneau ouvert)         */
 $sep-haut:            6px;   /* separateur = 1px + ces deux marges      */
 $sep-bas:             12px;
 $section-marge:       12px;  /* sous chaque groupe (mails, a venir)     */
@@ -37,6 +41,10 @@ $reco-marge:          12px;  /* ... puis cette marge                    */
 $reco-puce-marge:     8px;   /* pastille -> titre (joue sur la largeur) */
 $reco-detail-retrait: 18px;  /* retrait du detail (joue sur la largeur) */
 $bandeau-haut:        38px;  /* + 2 x $bordure                          */
+
+/* Panneau replie : texte gris-vert au lieu du blanc, voile plus leger. */
+$texte-replie:        #b0c4b6;
+$fond-replie:         rgba(255, 255, 255, 0.05);
 
 
 * { all: unset; }
@@ -58,8 +66,27 @@ window { background-color: transparent; }
 .header { margin-bottom: $entete-marge; }
 .title  { font-weight: bold; }
 
+/* chevron de repli, a gauche du titre (triangle bas = ouvert, triangle
+   droite = replie). Au survol de l'en-tete, il prend l'accent du bouton de
+   synchro : c'est le signe que l'en-tete se clique. */
+.chevron { margin-right: 8px; color: rgba(255, 255, 255, 0.75); }
+.entete-clic:hover .chevron { color: #8ecae6; }
+
 /* resume a droite de l'en-tete ("8 a traiter"...) */
 .resume { font-size: 13px; color: rgba(255, 255, 255, 0.75); margin-left: 12px; }
+
+/* --- Panneau replie : en-tete seul, attenue ---------------------------- */
+/* Pas de marge sous l'en-tete : il n'y a plus rien dessous, et le panneau
+   doit faire exactement HAUTEUR_ENTETE (59px, voir les constantes). Le
+   compteur reste lisible : gris-vert, pas plus sombre. */
+.panel.replie { background-color: $fond-replie; }
+.panel.replie .header { margin-bottom: 0; }
+.panel.replie .title,
+.panel.replie .resume,
+.panel.replie .chevron,
+.panel.replie .sync-icon { color: $texte-replie; }
+.panel.replie .sync-icon:hover,
+.panel.replie .entete-clic:hover .chevron { color: #8ecae6; }
 
 /* infobulle du bouton de synchro ("sync hh:mm") : "* { all: unset; }" la
    rendrait transparente et illisible sur le fond d'ecran */
