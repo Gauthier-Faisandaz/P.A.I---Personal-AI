@@ -89,7 +89,15 @@ sleep 1.5
 # le 12/08 -- voir eww.yuck. Seul le clic subsiste desormais ; il n'a besoin
 # d'aucun demon dedie (pas de risque de course sur un clic comme il y en
 # avait sur un survol).
-pkill -f "bash .*/hoverd\.sh" 2>/dev/null   # au cas ou une vieille instance trainerait
+#
+# Motifs ANCRES (^...$) pour ce pkill et celui du surveillant, plus bas :
+# la ligne de commande doit etre EXACTEMENT "bash <chemin>/hoverd.sh".
+# Sans ancres, "bash .*/hoverd\.sh" visait aussi toute commande qui
+# contenait ces mots quelque part (un "bash -c '... hoverd.sh'" lance
+# depuis un terminal ou un outil) -- meme famille de bug que le pkill -f
+# du surveillant, corrige le 11/09. [^ ]* = un mot sans espace (le chemin
+# de bash, puis celui du script).
+pkill -f "^[^ ]*bash ([^ ]*/)?hoverd\.sh$" 2>/dev/null   # au cas ou une vieille instance trainerait
 
 # --- Surveillant anti-blocage (24/08) --------------------------------------
 # Bug upstream confirme (elkowar/eww #451, #255), present meme en 0.6.0 (le
@@ -98,7 +106,7 @@ pkill -f "bash .*/hoverd\.sh" 2>/dev/null   # au cas ou une vieille instance tra
 # reparent une fenetre bloquee -- seul un "killall eww" (signal direct au
 # process, sans passer par le demon) marche a coup sur. Ce surveillant fait
 # exactement ca automatiquement : voir eww-watchdog.sh pour le detail.
-pkill -f "bash .*/eww-watchdog\.sh" 2>/dev/null
+pkill -f "^[^ ]*bash ([^ ]*/)?eww-watchdog\.sh$" 2>/dev/null   # motif ancre : voir hoverd.sh plus haut
 nohup bash "$HOME/.config/eww/eww-watchdog.sh" >/dev/null 2>&1 &
 disown
 
