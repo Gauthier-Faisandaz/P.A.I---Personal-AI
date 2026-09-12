@@ -28,6 +28,7 @@
 ;;   - fenetre colonne                      -> ouvrir-colonne.sh
 ;;   - fenetre modale                       -> ui.sh, ouvrir-colonne.sh
 ;;   - fenetre hud, widget hud_piece        -> ouvrir-hud.sh, cadre.py (verifier)
+;;   - fenetre hud (titre "Eww - hud")      -> decoupe-hud.py (NOM)
 
 
 ;; ==========================================================================
@@ -630,11 +631,15 @@
 ;; --- Fenetre hud : les trois pieces a verre -------------------------------
 ;; Rectangle englobant heure + sparklines + meteo. Le filigrane aura SA
 ;; fenetre (etape 4) : c'est du trait nu, qu'on exclura du flou de picom.
-;; Etape 2 : pas encore de decoupe, picom floute donc TOUT le rectangle, y
-;; compris les vides entre les pieces. C'est attendu : la decoupe X Shape de
-;; l'etape 3 le corrigera.
+;; Decoupe : picom floute TOUTE la surface d'une fenetre. Pour que seules les
+;; pieces soient floutees (et pas les vides entre elles), la fenetre recoit
+;; la forme exacte des trois pieces (X Shape), posee de l'exterieur par
+;; decoupe-hud.py : eww ne sait pas le faire. Cette forme est perdue a chaque
+;; recreation de la fenetre (eww reload, enregistrement de ce fichier...) :
+;; ouvrir-hud.sh la pose a l'ouverture, eww-watchdog.sh la repose (2 s max).
 ;; Meme couche que la colonne (bg/dock) : sous les fenetres normales, au-dessus
-;; du fond d'ecran. Ouverte par ouvrir-hud.sh (ecran de la colonne).
+;; du fond d'ecran. Ouverte par ouvrir-hud.sh (ecran de la colonne), lui-meme
+;; appele par start.sh et eww-watchdog.sh.
 (defwindow hud
   :monitor 0
   :geometry (geometry :x "28px" :y "26px" :width "882px" :height "506px" :anchor "top left")

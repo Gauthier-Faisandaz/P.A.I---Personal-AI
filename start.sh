@@ -145,6 +145,13 @@ printf '%s' "$TARGET" > "$HOME/.cache/eww/target_screen"
 # ecrit juste au-dessus.
 bash "$HOME/.config/eww/ouvrir-colonne.sh"
 
+# --- Panneau d'angle (HUD, coin haut-gauche) -------------------------------
+# Chantier independant de la colonne : sa propre fenetre, "hud", sur le meme
+# ecran (target_screen). ouvrir-hud.sh pose aussi sa decoupe (la forme des
+# trois pieces, pour que picom ne floute qu'elles) ; eww-watchdog.sh la
+# repose si la fenetre est recreee.
+bash "$HOME/.config/eww/ouvrir-hud.sh"
+
 # (La 2e fenetre, "modale" -- le detail d'un mail --, n'est PAS ouverte
 # ici : ui.sh l'ouvre au clic sur un mail et la ferme a la croix, avec de
 # vrais open/close. Voir ui.sh pour la raison : fond fantome sous picom.)

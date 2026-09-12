@@ -10,7 +10,7 @@ demande pas de redessiner.
 Chaque cadre produit DEUX choses depuis la meme geometrie :
   - le SVG peint en fond de la fenetre GTK ;
   - le polygone de decoupe (clip-path CSS pour la maquette, masque X Shape en
-    production).
+    production : voir decoupe() et decoupe-hud.py).
 
 Ce fichier est aussi la SOURCE UNIQUE des tailles et des positions du HUD :
 eww.yuck en recopie les nombres (section PANNEAU D'ANGLE), et
@@ -31,7 +31,8 @@ Usage :
     python3 cadre.py sparklines  > hud/sparklines.svg
     python3 cadre.py meteo       > hud/meteo.svg
     python3 cadre.py filigrane   > hud/filigrane.svg
-    python3 cadre.py clips                     # les polygones de decoupe
+    python3 cadre.py clips                     # les polygones (clip-path CSS, en %)
+    python3 cadre.py decoupe                   # les polygones X Shape (px, fenetre hud)
     python3 cadre.py geometrie                 # les nombres a recopier dans eww.yuck
     python3 cadre.py verifier [eww.yuck]       # eww.yuck est-il a jour ?
 (generer-cadres.sh fait les quatre SVG et la verification d'un coup.)
@@ -207,6 +208,14 @@ TAILLES = {
     'meteo':      (MET_W, MET_H),
 }
 
+# Contour de chaque piece a verre, dans son propre repere. Le filigrane n'en a
+# pas : c'est du trait nu, dans une fenetre ni decoupee ni floutee.
+CONTOURS = {
+    'heure':      heure_contour,
+    'sparklines': spk_contour,
+    'meteo':      met_contour,
+}
+
 # Deux fenetres eww (voir le brief, section 2) :
 #  - hud           : les trois pieces a verre, floutees, decoupees (X Shape) ;
 #  - hud-filigrane : le trait nu, rectangulaire, exclu du flou par picom.
@@ -227,6 +236,15 @@ def geometrie(fenetre):
     decalages = {p: (POSITIONS[p][0] - x0, POSITIONS[p][1] - y0) + TAILLES[p]
                  for p in pieces}
     return (x0, y0, x1 - x0, y1 - y0), decalages
+
+def decoupe(fenetre):
+    """Polygones de la forme X Shape de la fenetre : le contour de chaque
+    piece a verre, decale a sa place dans la fenetre (px entiers).
+    L'union de ces polygones est la seule zone que picom floutera.
+    Renvoie {piece: [(x, y), ...]}."""
+    _, dec = geometrie(fenetre)
+    return {p: [(round(x + dx), round(y + dy)) for x, y in CONTOURS[p]()]
+            for p, (dx, dy, _, _) in dec.items() if p in CONTOURS}
 
 def afficher_geometrie():
     """Les lignes a recopier dans eww.yuck, dans la forme exacte attendue."""
@@ -293,6 +311,9 @@ if __name__ == '__main__':
     elif quoi == 'meteo':     sys.stdout.write(meteo())
     elif quoi == 'filigrane': sys.stdout.write(filigrane())
     elif quoi == 'geometrie': afficher_geometrie()
+    elif quoi == 'decoupe':
+        for p, pts in decoupe('hud').items():
+            print(f'{p:<10} ' + ' '.join(f'{x},{y}' for x, y in pts))
     elif quoi == 'verifier':
         defaut = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'eww.yuck')
         sys.exit(verifier(sys.argv[2] if len(sys.argv) > 2 else defaut))

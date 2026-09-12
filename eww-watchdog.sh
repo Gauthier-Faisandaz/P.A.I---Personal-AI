@@ -12,10 +12,14 @@
 # sans passer par le demon pour repondre) a fonctionne de facon fiable a
 # chaque fois. Ce script fait donc la meme chose que "killall eww" +
 # "bash start.sh" combines, automatiquement, des qu'un blocage est detecte.
+#
+# Seconde tache (panneau d'angle, 12/09) : a chaque tick, redonner sa
+# decoupe a la fenetre "hud" si elle l'a perdue (voir decoupe-hud.py).
 CACHE="$HOME/.cache/eww"
 LOCK="$CACHE/watchdog.lock"
 LOG="$CACHE/watchdog.log"
 EWW="$HOME/.cargo/bin/eww"
+CFG="$HOME/.config/eww"
 mkdir -p "$CACHE"
 : > "$LOG"
 
@@ -52,7 +56,10 @@ full_restart() {
   sleep 1.5
   # Meme ecran et meme geometrie que start.sh : ouvrir-colonne.sh relit
   # target_screen et geometrie.conf.
-  bash "$HOME/.config/eww/ouvrir-colonne.sh" 2>/dev/null
+  bash "$CFG/ouvrir-colonne.sh" 2>/dev/null
+  # Le panneau d'angle aussi (meme ecran, lu dans target_screen) : le demon
+  # tue ci-dessus l'a emporte avec lui.
+  bash "$CFG/ouvrir-hud.sh" >/dev/null 2>&1
   log "redemarrage termine"
 }
 
@@ -70,5 +77,22 @@ while true; do
     log "detecte : $stuck"
     full_restart
   fi
+
+  # Decoupe du panneau d'angle : la forme de la fenetre "hud" est perdue a
+  # chaque recreation (eww reload, enregistrement de eww.yuck, close/open),
+  # et une fenetre recreee a un NOUVEL identifiant X. On relit donc
+  # l'identifiant a chaque tick (xwininfo : ~5 ms, programme en C) et on ne
+  # lance decoupe-hud.py (Python : ~25 ms) que s'il a change. Lancer Python a
+  # chaque tick coutait ~4 % d'un coeur en permanence (mesure le 12/09).
+  # hud_decoupe = identifiant dont la forme est CONFIRMEE (code 0) : en cas
+  # d'echec, il ne change pas, et le tick suivant reessaie.
+  # xwininfo et decoupe-hud.py parlent au serveur X, jamais au demon eww :
+  # un demon bloque ne les bloque pas.
+  hud="$(xwininfo -name 'Eww - hud' 2>/dev/null | awk '/Window id/ {print $4}')"
+  if [ -n "$hud" ] && [ "$hud" != "$hud_decoupe" ]; then
+    out="$(python3 -B "$CFG/decoupe-hud.py" --xid "$hud" 2>&1)" && hud_decoupe="$hud"
+    [ -n "$out" ] && log "hud : $out"
+  fi
+
   sleep 2
 done
