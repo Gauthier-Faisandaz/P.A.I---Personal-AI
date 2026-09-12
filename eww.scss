@@ -316,3 +316,18 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   min-height: 6px;
   background-color: rgba(255, 255, 255, 0.85);
 }
+
+/* --- Panneau d'angle (HUD) : cadres SVG en fond ------------------------ */
+/* Chantier independant de la colonne. Chaque piece (widget hud_piece,
+   eww.yuck) porte son cadre, genere par cadre.py, en background-image. Le
+   chemin de l'image et la taille de la piece sont poses par eww.yuck (ils
+   dependent de EWW_CONFIG_DIR et de cadre.py, que ce fichier ne connait
+   pas) ; ici, seulement la facon de poser l'image.
+   "* { all: unset; }" remet ces proprietes a leur valeur par defaut (image
+   REPETEE en mosaique) : on les redonne explicitement. Taille naturelle
+   (auto) : le SVG fait deja exactement la taille de la piece. */
+.hud-piece {
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-size: auto;
+}
