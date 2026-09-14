@@ -287,34 +287,14 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 .coupe { font-size: 13px; color: white; margin-left: 8px; }
 
 /* --- Bandeau (bas de la colonne) --------------------------------------- */
-/* Meme verre que les panneaux, mais une seule ligne de ~38px et une
-   police plus petite : la date, le vrac et 3 jauges doivent tenir dans
-   les 633px de la colonne. */
+/* VIDE depuis le 14/09 : il ne reste que le verre, a la meme hauteur qu'avant
+   (min-height = $bandeau-haut, 38px + bordures) pour que la colonne ne
+   bouge pas. Les styles de l'ancien contenu (date, vrac, jauges et leurs
+   barres) sont dans l'historique git. */
 .bandeau {
   background-color: rgba(255, 255, 255, 0.1);
   border: $bordure solid rgba(255, 255, 255, 0.25);
-  padding: 0 18px;
   min-height: $bandeau-haut;
-  color: white;
-  font-family: "DejaVu Sans Mono", monospace;
-  font-size: 12px;
-}
-.bandeau-sep { margin: 0 10px; color: rgba(255, 255, 255, 0.5); }
-.vrac        { color: rgba(255, 255, 255, 0.85); }
-
-.jauge     { margin-left: 12px; }
-.jauge-nom { font-size: 11px; color: rgba(255, 255, 255, 0.75); }
-
-/* Barres (widget progress) : "trough" = le fond, "progress" = la partie
-   remplie. Les deux doivent etre styles explicitement (teste le 10/09). */
-.barre trough {
-  min-width: 32px;
-  min-height: 6px;
-  background-color: rgba(255, 255, 255, 0.2);
-}
-.barre progress {
-  min-height: 6px;
-  background-color: rgba(255, 255, 255, 0.85);
 }
 
 /* --- Panneau d'angle (HUD) : cadres SVG en fond ------------------------ */
