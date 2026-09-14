@@ -1,42 +1,39 @@
 #!/usr/bin/env python3
 """
-decoupe-hud.py - donne a la fenetre eww "hud" la forme exacte de ses trois
-pieces (extension X Shape), pour que picom ne floute QUE les pieces, et pas
-les vides entre elles.
+decoupe-hud.py - donne a chaque fenetre du panneau d'angle (hud-heure,
+hud-meteo, hud-sparklines) la forme exacte de ses hexagones (extension X
+Shape), pour que picom ne floute QUE les hexagones, et pas le rectangle de
+la fenetre autour.
 
 Pourquoi un script externe : eww 0.6.0 ne sait pas donner une forme a une
-fenetre (spike du 11/09). On la pose donc de l'exterieur, sur la fenetre X
-deja ouverte. Le spike a verifie que picom (glx, dual_kawase) arrete bien son
-flou sur cette forme, y compris sous Openbox (qui la recopie sur son cadre).
+fenetre (spike du 11/09). On la pose donc de l'exterieur, sur les fenetres X
+deja ouvertes.
 
 La forme vit sur la fenetre X, pas dans eww : eww reload, un close/open, un
-enregistrement de eww.yuck ou un redemarrage du demon recreent la fenetre,
+enregistrement de eww.yuck ou un redemarrage du demon recreent les fenetres,
 SANS forme. D'ou deux appels :
   - ouvrir-hud.sh, juste apres l'ouverture (option --attendre) ;
-  - eww-watchdog.sh, quand la fenetre a change (nouvel identifiant X).
+  - eww-watchdog.sh, quand les identifiants X des fenetres ont change.
 
-Econome, a deux niveaux :
-  - si la fenetre a DEJA une forme, on ne touche a rien. La reposer enverrait
-    un evenement ShapeNotify, et picom recalculerait la zone et repeindrait
-    le flou, pour rien ;
-  - le watchdog ne lance ce script que si l'identifiant de la fenetre a
-    change (il le lit avec xwininfo, ~5 ms). Lancer Python a chaque tick
-    coutait ~4 % d'un coeur en permanence (mesure le 12/09, i5-4210U).
+Ne touche pas une fenetre qui a DEJA une forme : la reposer enverrait un
+evenement ShapeNotify, et picom recalculerait et repeindrait le flou pour
+rien.
 
-Geometrie : cadre.py (source unique), fonction decoupe("hud").
+Geometrie : cadre.py (source unique), PIECES et decoupe(). Chaque forme doit
+etre symetrique haut/bas dans sa fenetre, a cause d'un bogue de picom 10.2
+(voir cadre.py) ; "python3 cadre.py verifier" le controle.
 Zero dependance Python : ctypes sur libX11 et libXext, deja installees.
 
 Usage :
-    python3 decoupe-hud.py              # cherche la fenetre, pose la forme si besoin
-    python3 decoupe-hud.py --attendre   # idem, en guettant la fenetre jusqu'a 3 s
-    python3 decoupe-hud.py --xid 0x...  # fenetre deja connue (watchdog) : pas de recherche
-    python3 decoupe-hud.py --etat       # dit seulement si la fenetre existe et a sa forme
-Sortie : une ligne SEULEMENT quand la forme est posee (le watchdog la journalise).
+    python3 decoupe-hud.py              # decoupe les fenetres hud-* qui n'ont pas leur forme
+    python3 decoupe-hud.py --attendre   # idem, en attendant jusqu'a 3 s qu'elles existent toutes
+    python3 decoupe-hud.py --etat       # dit seulement, pour chacune, si elle existe et a sa forme
+Sortie : une ligne par forme POSEE (le watchdog la journalise), rien sinon.
 Code de sortie :
-    0  la fenetre a sa forme (deja, ou posee a l'instant)
+    0  toutes les fenetres hud-* presentes ont leur forme
     1  serveur X injoignable
-    2  pas de fenetre hud (HUD ferme : rien a faire)
-    3  forme absente apres la pose (fenetre disparue entre-temps ?)
+    2  aucune fenetre hud-* (HUD ferme : rien a faire)
+    3  une forme manque apres la pose (fenetre disparue entre-temps ?)
 """
 import ctypes
 import os
@@ -46,9 +43,9 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cadre
 
-# Titre que eww donne a la fenetre "hud" ("Eww - " + nom du defwindow,
-# verifie avec xprop). A changer si la fenetre est renommee dans eww.yuck.
-NOM = b'Eww - hud'
+# Titre X de chaque fenetre -> piece ("Eww - " + nom du defwindow, verifie
+# avec xprop). Les noms viennent de cadre.py : rien a changer ici.
+TITRES = {f'Eww - {cadre.fenetre_eww(p)}'.encode(): p for p in cadre.PIECES}
 
 # Constantes de X11 / de l'extension Shape (X11/extensions/shape.h)
 SHAPE_BOUNDING, SHAPE_INPUT, SHAPE_SET, EVEN_ODD = 0, 2, 0, 0
@@ -85,7 +82,7 @@ xext.XShapeCombineRegion.argtypes = [Display, Window, ctypes.c_int, ctypes.c_int
 _i, _u = ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_uint)
 xext.XShapeQueryExtents.argtypes = [Display, Window, _i, _i, _i, _u, _u, _i, _i, _i, _u, _u]
 
-# Erreurs X : la fenetre peut disparaitre entre le moment ou on la trouve et
+# Erreurs X : une fenetre peut disparaitre entre le moment ou on la trouve et
 # celui ou on la decoupe (eww la recree). Par defaut, Xlib TUE le programme
 # sur une telle erreur ; on l'ignore : le code de sortie 3 le signalera, et
 # le watchdog reessaiera avec la nouvelle fenetre.
@@ -104,25 +101,23 @@ def nom_de(dpy, w):
         x11.XFree(p)
 
 
-def trouver(dpy, fenetre, profondeur=2):
-    """Cherche la fenetre NOM sous `fenetre`. Profondeur 2 : sous Openbox, la
-    fenetre eww est l'enfant d'un cadre, lui-meme enfant de la racine."""
+def trouver(dpy, fenetre, trouvees, profondeur=2):
+    """Remplit `trouvees` {piece: identifiant} avec les fenetres hud-* situees
+    sous `fenetre`. Profondeur 2 : sous Openbox, une fenetre eww est l'enfant
+    d'un cadre, lui-meme enfant de la racine."""
     racine, parent, enfants, n = Window(), Window(), PWindow(), ctypes.c_uint()
     if not x11.XQueryTree(dpy, fenetre, ctypes.byref(racine), ctypes.byref(parent),
                           ctypes.byref(enfants), ctypes.byref(n)):
-        return None
+        return
     liste = [enfants[i] for i in range(n.value)]
     if n.value:
         x11.XFree(ctypes.cast(enfants, ctypes.c_void_p))
     for w in liste:
-        if nom_de(dpy, w) == NOM:
-            return w
-    if profondeur > 1:
-        for w in liste:
-            trouvee = trouver(dpy, w, profondeur - 1)
-            if trouvee:
-                return trouvee
-    return None
+        piece = TITRES.get(nom_de(dpy, w))
+        if piece:
+            trouvees[piece] = w
+        elif profondeur > 1:
+            trouver(dpy, w, trouvees, profondeur - 1)
 
 
 def a_une_forme(dpy, w):
@@ -132,11 +127,11 @@ def a_une_forme(dpy, w):
     return bool(v[0].value)          # bounding_shaped
 
 
-def poser(dpy, w):
-    """Forme = union des polygones de cadre.decoupe("hud"). Posee aussi en
-    forme d'ENTREE : un clic dans un vide traverse jusqu'au bureau."""
+def poser(dpy, w, piece):
+    """Forme = union des hexagones de cadre.decoupe(piece). Posee aussi en
+    forme d'ENTREE : un clic hors des hexagones traverse jusqu'au bureau."""
     region = x11.XCreateRegion()
-    for pts in cadre.decoupe('hud').values():
+    for pts in cadre.decoupe(piece):
         tableau = (XPoint * len(pts))(*[XPoint(x, y) for x, y in pts])
         morceau = x11.XPolygonRegion(tableau, len(pts), EVEN_ODD)
         x11.XUnionRegion(region, morceau, region)
@@ -148,39 +143,41 @@ def poser(dpy, w):
 
 
 def main():
-    args = sys.argv[1:]
-    attendre, etat = '--attendre' in args, '--etat' in args
-    xid = int(args[args.index('--xid') + 1], 0) if '--xid' in args else None
-
+    attendre, etat = '--attendre' in sys.argv, '--etat' in sys.argv
     dpy = x11.XOpenDisplay(None)
     if not dpy:
         print('decoupe-hud : serveur X injoignable', file=sys.stderr)
         return 1
     x11.XSetErrorHandler(_ignorer)
     try:
-        w = xid
-        if w is None:
-            racine = x11.XDefaultRootWindow(dpy)
-            limite = time.monotonic() + (3 if attendre else 0)
-            while True:
-                w = trouver(dpy, racine)
-                if w or time.monotonic() >= limite:
-                    break
-                time.sleep(0.1)
-        if not w:
-            if etat:
-                print('fenetre hud : absente')
-            return 2
+        racine = x11.XDefaultRootWindow(dpy)
+        limite = time.monotonic() + (3 if attendre else 0)
+        while True:
+            trouvees = {}
+            trouver(dpy, racine, trouvees)
+            if len(trouvees) == len(cadre.PIECES) or time.monotonic() >= limite:
+                break
+            time.sleep(0.1)
         if etat:
-            print(f'fenetre hud {hex(w)} : forme {"OUI" if a_une_forme(dpy, w) else "NON"}')
-            return 0 if a_une_forme(dpy, w) else 3
-        if a_une_forme(dpy, w):
-            return 0
-        poser(dpy, w)
-        if not a_une_forme(dpy, w):
-            return 3
-        print(f'decoupe posee sur {hex(w)}')
-        return 0
+            for piece in cadre.PIECES:
+                w = trouvees.get(piece)
+                forme = ('forme OUI' if a_une_forme(dpy, w) else 'forme NON') if w else 'absente'
+                print(f'{cadre.fenetre_eww(piece):<15} {hex(w) if w else "-":<11} {forme}')
+        if not trouvees:
+            return 2
+        manque = False
+        for piece, w in trouvees.items():
+            if a_une_forme(dpy, w):
+                continue
+            if etat:
+                manque = True
+                continue
+            poser(dpy, w, piece)
+            if a_une_forme(dpy, w):
+                print(f'decoupe posee sur {cadre.fenetre_eww(piece)} ({hex(w)})')
+            else:
+                manque = True
+        return 3 if manque else 0
     finally:
         x11.XCloseDisplay(dpy)
 

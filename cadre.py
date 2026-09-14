@@ -1,323 +1,234 @@
 #!/usr/bin/env python3
 """
-Vocabulaire de cadres HUD pour le panneau d'angle du dashboard PAI.
+cadre.py - geometrie du panneau d'angle (HUD) : une colonne d'hexagones le
+long du bord gauche de l'ecran, et les cadres SVG qui la dessinent.
 
-Plutot que de dessiner trois cadres a la main, on definit un petit vocabulaire
-de pieces -- equerre, encoche, blocs segmentes, noeud, barre hachuree, connecteur --
-et on compose. Modifier une piece la corrige partout ; ajouter un panneau ne
-demande pas de redessiner.
+Source UNIQUE de la geometrie : eww.yuck en recopie les nombres (section
+PANNEAU D'ANGLE), decoupe-hud.py en tire la forme X Shape de chaque fenetre,
+et "python3 cadre.py verifier" controle que tout concorde.
 
-Chaque cadre produit DEUX choses depuis la meme geometrie :
-  - le SVG peint en fond de la fenetre GTK ;
-  - le polygone de decoupe (clip-path CSS pour la maquette, masque X Shape en
-    production : voir decoupe() et decoupe-hud.py).
+Disposition (croquis de Gauthier du 14/09, 60 % de la hauteur de l'ecran),
+tout empile verticalement, hexagones reguliers "pointe en haut" :
+  - heure      : un grand hexagone, rogne par le haut et la gauche de l'ecran ;
+  - meteo      : un nid d'abeille de 7 hexagones egaux (centre + 6 voisins),
+                 rogne a gauche ; la cellule de gauche est une piece a part
+                 (son propre contour), les 6 autres ne font qu'une forme ;
+  - sparklines : 3 hexagones empiles.
+Aucune decoration pour l'instant (demande du 14/09) : verre + contour.
 
-Ce fichier est aussi la SOURCE UNIQUE des tailles et des positions du HUD :
-eww.yuck en recopie les nombres (section PANNEAU D'ANGLE), et
-"python3 cadre.py verifier" controle que la copie est a jour.
+REGLE IMPOSEE PAR PICOM (bogue de picom 10.2, moteur glx, constate le
+14/09) : sur une fenetre decoupee, picom ne floute un pixel (x, y) que si
+son symetrique haut/bas (x, H - y) est AUSSI dans la forme (H = hauteur de
+la fenetre). Chaque fenetre doit donc etre symetrique par rapport a son axe
+horizontal, sinon des morceaux du verre restent nets. D'ou :
+  - une fenetre par piece (l'ensemble n'est pas symetrique, chaque piece l'est) ;
+  - l'heure n'est pas "coupee" par le haut de l'ecran : l'hexagone est
+    ENTIER dans sa fenetre, et c'est la fenetre qui commence au-dessus de
+    l'ecran (y negatif, accepte par eww et Openbox : teste le 14/09) ;
+  - les coupes a GAUCHE, elles, sont sans danger (une coupe verticale ne
+    casse pas la symetrie haut/bas) : les fenetres commencent en x >= 0.
+    Surtout pas x < 0 : a gauche de l'ecran HDMI se trouve l'ecran du
+    portable (il commence en y = 321), la fenetre y deborderait.
+"python3 cadre.py verifier" controle cette symetrie.
 
-Couleurs : blanc uniquement, aux opacites du dashboard (eww.scss).
+Couleurs (tokens de eww.scss) :
     verre    rgba(255,255,255,.10)   = .panel background-color
-    contour  rgba(255,255,255,.28)   ~ .panel border (.25), un cran plus lisible
-    accent   rgba(255,255,255,.55)   = equerres et amorces, ce qui fait le style
-    filet    rgba(255,255,255,.30)   = filigrane hors cadre
-    hachure  rgba(255,255,255,.22)
+    contour  rgba(255,255,255,.55)   plus marque que .panel (.25) : sans
+                                     decoration, c'est lui qui dessine la forme
 
 ATTENTION : ce fichier genere du SVG consomme par librsvg. Rester en ASCII
 dans les chaines produites (les commentaires Python n'y vont pas).
 
 Usage :
-    python3 cadre.py heure       > hud/heure.svg
-    python3 cadre.py sparklines  > hud/sparklines.svg
-    python3 cadre.py meteo       > hud/meteo.svg
-    python3 cadre.py filigrane   > hud/filigrane.svg
-    python3 cadre.py clips                     # les polygones (clip-path CSS, en %)
-    python3 cadre.py decoupe                   # les polygones X Shape (px, fenetre hud)
-    python3 cadre.py geometrie                 # les nombres a recopier dans eww.yuck
-    python3 cadre.py verifier [eww.yuck]       # eww.yuck est-il a jour ?
-(generer-cadres.sh fait les quatre SVG et la verification d'un coup.)
+    python3 cadre.py heure        > hud/heure.svg
+    python3 cadre.py meteo        > hud/meteo.svg
+    python3 cadre.py sparklines   > hud/sparklines.svg
+    python3 cadre.py decoupe                   # polygones X Shape (repere de chaque fenetre)
+    python3 cadre.py geometrie                 # les lignes a recopier dans eww.yuck
+    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? fenetres symetriques ?
+(generer-cadres.sh fait les SVG et la verification d'un coup.)
 """
+import math
 import os
 import re
 import sys
 
 VERRE   = 'rgba(255,255,255,.10)'
-CONTOUR = 'rgba(255,255,255,.28)'
-ACCENT  = 'rgba(255,255,255,.55)'
-FILET   = 'rgba(255,255,255,.30)'
-HACHURE = 'rgba(255,255,255,.22)'
+CONTOUR = 'rgba(255,255,255,.55)'
+# Epaisseur du trait de contour. Seule sa moitie INTERIEURE est visible : la
+# decoupe X Shape de la fenetre coupe tout ce qui depasse de la forme.
+TRAIT = 2.4
 
-# ---------------------------------------------------------------- vocabulaire
+S3 = math.sqrt(3) / 2
 
-def poly(pts, close=True):
-    d = 'M' + ' L'.join(f'{x:g},{y:g}' for x, y in pts)
-    return d + ' Z' if close else d
+def hexa(cx, cy, R):
+    """Hexagone regulier "pointe en haut", de rayon R (centre -> sommet).
+    R pair et decalages arrondis AVANT d'ajouter le centre : les sommets
+    tombent sur des pixels entiers, deux cellules voisines partagent
+    exactement leurs sommets, et la symetrie haut/bas est exacte."""
+    assert R % 2 == 0, 'R doit etre pair'
+    a, b = round(S3 * R), R // 2
+    return [(cx, cy - R), (cx + a, cy - b), (cx + a, cy + b),
+            (cx, cy + R), (cx - a, cy + b), (cx - a, cy - b)]
 
-def trace(d, col=CONTOUR, w=1.4, extra=''):
-    return f'<path d="{d}" fill="none" stroke="{col}" stroke-width="{w}" {extra}/>'
+# ---------------------------------------------------------------- geometrie
+# Chaque piece = une fenetre eww, nommee "hud-<piece>".
+#   fenetre  : (x, y, largeur, hauteur) en px, repere de l'ecran du dashboard
+#              (1920 x 1080). y < 0 = la fenetre commence au-dessus de l'ecran.
+#   cellules : (cx, cy, R, groupe), dans le repere de la FENETRE.
+#              groupe "forme"  : fusionnee avec les autres cellules "forme"
+#                                (pas de trait entre elles) ;
+#              groupe "a_part" : cellule a son propre contour complet.
+# Axe commun : toutes les pieces sont centrees sur x = 52 (ecran).
+# Ecarts : ~10 px entre les pieces, 9 px entre deux sparklines.
 
-def equerre(x, y, sx, sy, bras=20, w=2.2, col=ACCENT):
-    """Equerre d'angle : deux segments partant du meme point."""
-    return trace(f'M{x + sx * bras:g},{y:g} L{x:g},{y:g} L{x:g},{y + sy * bras:g}',
-                 col, w, 'stroke-linecap="square"')
+# Meteo : cellules de rayon 38 (66 x 76 px). Dans un nid d'abeille "pointe en
+# haut", les voisins sont a (+-2a, 0) et (+-a, +-3b) du centre.
+RM = 38
+AM, BM = round(S3 * RM), RM // 2     # 33, 19
+MX, MY = 52, 95                      # centre du nid, repere de la fenetre
 
-def blocs(x, y, n=5, bw=12, bh=6, gap=4, col=ACCENT):
-    """Rangee de petits blocs pleins -- la bande d'identification des HUD."""
-    return ''.join(f'<rect x="{x + i * (bw + gap):g}" y="{y:g}" width="{bw}" '
-                   f'height="{bh}" fill="{col}"/>' for i in range(n))
-
-def noeud(x, y, r=3.5, col=FILET):
-    return f'<circle cx="{x:g}" cy="{y:g}" r="{r}" fill="none" stroke="{col}" stroke-width="1.2"/>'
-
-def hachure(x, y, w, h, biais=0):
-    """Bande hachuree a 45 degres. Le biais decale le bord droit (parallelogramme)."""
-    p = poly([(x, y), (x + w, y), (x + w + biais, y + h), (x + biais, y + h)])
-    return f'<path d="{p}" fill="url(#hach)"/>'
-
-def connecteur(pts, col=FILET, w=1.1):
-    """Ligne brisee du filigrane."""
-    return trace(poly(pts, False), col, w, 'stroke-linejoin="round"')
-
-DEFS = ('<defs><pattern id="hach" width="7" height="7" patternUnits="userSpaceOnUse" '
-        'patternTransform="rotate(45)">'
-        f'<line x1="0" y1="0" x2="0" y2="7" stroke="{HACHURE}" stroke-width="2"/>'
-        '</pattern></defs>')
-
-def svg(w, h, corps):
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" '
-            f'viewBox="0 0 {w} {h}" overflow="visible">{DEFS}{corps}</svg>\n')
-
-def clip(pts, w, h):
-    return 'polygon(' + ', '.join(f'{x / w * 100:.3f}% {y / h * 100:.3f}%' for x, y in pts) + ')'
-
-# ---------------------------------------------------------------- les cadres
-
-# Amorce du connecteur heure -> filigrane (trait de 14 px).
-# Historique : elle etait dessinee par heure(), de x = 300 a 314, donc HORS
-# de l'image de 300 px. Un navigateur la montre (overflow visible), GTK la
-# rogne : elle etait invisible sur le bureau. Elle vit desormais au debut du
-# filigrane (fenetre sans decoupe ni flou, faite pour le trait nu), qui
-# commence donc AMORCE px plus a gauche : pile au bord droit de heure.
-AMORCE = 14
-
-HEURE_W, HEURE_H = 300, 160
-def heure_contour():
-    c, g = 12, 30     # coupe haut-gauche, coupe bas-droite
-    return [(c, 0), (HEURE_W, 0), (HEURE_W, HEURE_H - g), (HEURE_W - g, HEURE_H),
-            (0, HEURE_H), (0, c)]
-
-def heure():
-    W, H, p = HEURE_W, HEURE_H, heure_contour()
-    s  = f'<path d="{poly(p)}" fill="{VERRE}"/>'
-    s += trace(poly(p))
-    # encoches sur l'arete haute : deux tabulations posees sur la ligne
-    s += trace(f'M96,0 L104,8 L150,8 L158,0', ACCENT, 1.6)
-    s += blocs(172, 3, n=3, bw=14, bh=4)
-    # equerres
-    s += equerre(8, 12, 1, 1) + equerre(W - 8, 8, -1, 1)
-    s += equerre(8, H - 8, 1, -1) + equerre(W - 8, H - 8 - 30, -1, -1, bras=14)
-    # double ligne interieure a gauche
-    s += trace('M6,44 L6,104', ACCENT, 1.4)
-    s += trace('M10,52 L10,96', FILET, 1)
-    # bande hachuree en bas a gauche
-    s += hachure(20, H - 12, 46, 7, biais=6)
-    # (l'amorce du connecteur vers le filigrane est dans filigrane() : voir AMORCE)
-    return svg(W, H, s)
-
-SPK_W, SPK_H = 570, 106
-def spk_contour():
-    return [(14, 0), (SPK_W, 0), (SPK_W, SPK_H - 34), (SPK_W - 46, SPK_H),
-            (0, SPK_H), (0, 14)]
-
-def sparklines():
-    W, H, p = SPK_W, SPK_H, spk_contour()
-    s  = f'<path d="{poly(p)}" fill="{VERRE}"/>'
-    s += trace(poly(p))
-    s += equerre(10, 14, 1, 1) + equerre(W - 8, 8, -1, 1)
-    s += equerre(8, H - 8, 1, -1)
-    # deux separateurs verticaux, un par cellule
-    s += trace(f'M{W/3:g},16 L{W/3:g},{H-20:g}', FILET, 1)
-    s += trace(f'M{2*W/3:g},16 L{2*W/3:g},{H-20:g}', FILET, 1)
-    return svg(W, H, s)
-
-FIL_W, FIL_H = 592 + AMORCE, 46
-def filigrane():
-    """Bande de circuiterie au-dessus des sparklines. Purement decorative :
-    aucun verre, que du trait -- elle n'aura donc pas de flou (voir la note
-    du brief : un flou derriere une ligne de 1 px ne produit rien de visible).
-
-    Les AMORCE premiers pixels portent l'amorce qui la relie a heure ; le
-    dessin d'origine suit, decale d'autant (groupe translate) pour garder ses
-    coordonnees lisibles."""
-    W, H = FIL_W, FIL_H
-    # amorce : bord droit de heure -> noeud du bas (y = 30 ici = y 28 dans heure)
-    s  = connecteur([(0, 30), (AMORCE, 30)])
-    s += f'<g transform="translate({AMORCE},0)">'
-    s += noeud(6, 12) + noeud(6, 30)
-    s += connecteur([(12, 12), (34, 12), (44, 22), (170, 22)])
-    s += connecteur([(12, 30), (28, 30), (38, 20), (60, 20)])
-    s += blocs(64, 6, n=5, bw=11, bh=7)
-    # chevron central
-    s += trace('M196,26 L208,10 L220,26', ACCENT, 1.6, 'stroke-linejoin="miter"')
-    s += hachure(228, 8, 96, 8, biais=8)
-    s += trace('M232,30 L350,30 L364,18 L470,18', CONTOUR, 1.4, 'stroke-linejoin="round"')
-    s += connecteur([(474, 18), (512, 18), (522, 8), (566, 8)])
-    s += connecteur([(474, 26), (516, 26), (526, 36), (566, 36)])
-    s += noeud(574, 8) + noeud(574, 36)
-    s += '</g>'
-    return svg(W, H, s)
-
-MET_W, MET_H = 190, 330
-def met_contour():
-    c, g = 14, 34
-    return [(c, 0), (MET_W - 26, 0), (MET_W, 26), (MET_W, MET_H - g),
-            (MET_W - g, MET_H), (0, MET_H), (0, c)]
-
-def meteo():
-    W, H, p = MET_W, MET_H, met_contour()
-    s  = f'<path d="{poly(p)}" fill="{VERRE}"/>'
-    s += trace(poly(p))
-    s += equerre(8, 14, 1, 1) + equerre(8, H - 8, 1, -1)
-    # noeud en haut a droite, relie a la coupe
-    s += noeud(W - 16, 14, r=5, col=ACCENT)
-    s += trace(f'M{W-16:g},19 L{W-16:g},30', ACCENT, 1.4)
-    # colonne de blocs sur le bord droit
-    s += ''.join(f'<rect x="{W-14:g}" y="{44 + i*12:g}" width="7" height="7" fill="{ACCENT}"/>'
-                 for i in range(4))
-    s += trace(f'M{W-10:g},96 L{W-10:g},150', FILET, 1)
-    # hachures haut-gauche et bas
-    s += hachure(20, 6, 40, 7, biais=6)
-    s += hachure(24, H - 14, 58, 8, biais=7)
-    s += trace(f'M6,60 L6,120', ACCENT, 1.4)
-    return svg(W, H, s)
-
-# ---------------------------------------------------------------- positions
-
-# Coin haut-gauche de chaque piece, en px, dans le repere de l'ecran du
-# dashboard (1920 x 1080, hauteur utile 1046).
-POSITIONS = {
-    'heure':      (28, 26),
-    'filigrane':  (342 - AMORCE, 24),   # 328 : colle au bord droit de heure
-    'sparklines': (340, 80),
-    'meteo':      (28, 202),
-}
-TAILLES = {
-    'heure':      (HEURE_W, HEURE_H),
-    'filigrane':  (FIL_W, FIL_H),
-    'sparklines': (SPK_W, SPK_H),
-    'meteo':      (MET_W, MET_H),
+PIECES = {
+    # Heure : rayon 88 (152 x 176 px), centre ecran (52, 56) : 32 px au-dessus
+    # de l'ecran (y negatif), 24 px a gauche (coupe verticale par la fenetre).
+    'heure': {
+        'fenetre':  (0, -32, 128, 176),
+        'cellules': [(52, 88, 88, 'forme')],
+    },
+    'meteo': {
+        'fenetre':  (0, 154, 151, 190),
+        'cellules': [(MX,          MY,          RM, 'forme'),    # centre
+                     (MX + AM,     MY - 3 * BM, RM, 'forme'),    # haut-droit
+                     (MX + 2 * AM, MY,          RM, 'forme'),    # droit
+                     (MX + AM,     MY + 3 * BM, RM, 'forme'),    # bas-droit
+                     (MX - AM,     MY + 3 * BM, RM, 'forme'),    # bas-gauche (a moitie rogne)
+                     (MX - AM,     MY - 3 * BM, RM, 'forme'),    # haut-gauche (a moitie rogne)
+                     (MX - 2 * AM, MY,          RM, 'a_part')],  # gauche (presque hors ecran)
+    },
+    # Sparklines : rayon 46 (80 x 92 px), empilees, 9 px entre deux.
+    'sparklines': {
+        'fenetre':  (12, 355, 80, 294),
+        'cellules': [(40, 46, 46, 'forme'), (40, 147, 46, 'forme'), (40, 248, 46, 'forme')],
+    },
 }
 
-# Contour de chaque piece a verre, dans son propre repere. Le filigrane n'en a
-# pas : c'est du trait nu, dans une fenetre ni decoupee ni floutee.
-CONTOURS = {
-    'heure':      heure_contour,
-    'sparklines': spk_contour,
-    'meteo':      met_contour,
-}
+def fenetre_eww(piece):
+    """Nom de la fenetre eww (defwindow) de la piece ; son titre X est
+    "Eww - " + ce nom (verifie avec xprop)."""
+    return 'hud-' + piece
 
-# Deux fenetres eww (voir le brief, section 2) :
-#  - hud           : les trois pieces a verre, floutees, decoupees (X Shape) ;
-#  - hud-filigrane : le trait nu, rectangulaire, exclu du flou par picom.
-FENETRES = {
-    'hud':           ['heure', 'sparklines', 'meteo'],
-    'hud-filigrane': ['filigrane'],
-}
+def decoupe(piece):
+    """Polygones de la forme X Shape de la fenetre (un par cellule, repere de
+    la fenetre). Leur union est la seule zone affichee, et floutee, par picom."""
+    return [hexa(cx, cy, R) for cx, cy, R, _ in PIECES[piece]['cellules']]
 
-def geometrie(fenetre):
-    """Rectangle englobant des pieces de la fenetre, et decalage (dx, dy) de
-    chaque piece par rapport au coin de la fenetre.
-    Renvoie ((x, y, w, h), {piece: (dx, dy, w, h)})."""
-    pieces = FENETRES[fenetre]
-    x0 = min(POSITIONS[p][0] for p in pieces)
-    y0 = min(POSITIONS[p][1] for p in pieces)
-    x1 = max(POSITIONS[p][0] + TAILLES[p][0] for p in pieces)
-    y1 = max(POSITIONS[p][1] + TAILLES[p][1] for p in pieces)
-    decalages = {p: (POSITIONS[p][0] - x0, POSITIONS[p][1] - y0) + TAILLES[p]
-                 for p in pieces}
-    return (x0, y0, x1 - x0, y1 - y0), decalages
+def symetrique(piece):
+    """La regle de picom (voir en tete) : chaque cellule a-t-elle sa jumelle
+    symetrique haut/bas dans la fenetre ? (Un hexagone "pointe en haut" est
+    lui-meme symetrique : il suffit de comparer les centres.)"""
+    h = PIECES[piece]['fenetre'][3]
+    cellules = {(cx, cy, R) for cx, cy, R, _ in PIECES[piece]['cellules']}
+    return cellules == {(cx, h - cy, R) for cx, cy, R in cellules}
 
-def decoupe(fenetre):
-    """Polygones de la forme X Shape de la fenetre : le contour de chaque
-    piece a verre, decale a sa place dans la fenetre (px entiers).
-    L'union de ces polygones est la seule zone que picom floutera.
-    Renvoie {piece: [(x, y), ...]}."""
-    _, dec = geometrie(fenetre)
-    return {p: [(round(x + dx), round(y + dy)) for x, y in CONTOURS[p]()]
-            for p, (dx, dy, _, _) in dec.items() if p in CONTOURS}
+# ---------------------------------------------------------------- SVG
+
+def chemin(polygones):
+    return ' '.join('M' + ' L'.join(f'{x},{y}' for x, y in p) + ' Z' for p in polygones)
+
+def aretes_contour(piece):
+    """Aretes a tracer : le bord exterieur des cellules "forme" (une arete
+    partagee par deux cellules voisines est interieure : on l'ecarte), plus
+    toutes les aretes des cellules "a_part"."""
+    compte, a_part = {}, []
+    for cx, cy, R, groupe in PIECES[piece]['cellules']:
+        p = hexa(cx, cy, R)
+        aretes = [(p[i], p[(i + 1) % 6]) for i in range(6)]
+        if groupe == 'a_part':
+            a_part += aretes
+        else:
+            for a, b in aretes:
+                cle = frozenset((a, b))
+                compte[cle] = compte.get(cle, 0) + 1
+    bord = [tuple(sorted(cle)) for cle, n in compte.items() if n == 1]
+    return bord + a_part
+
+def svg_piece(piece):
+    """Cadre d'une piece, a la taille de sa fenetre : verre sur l'union des
+    cellules, puis le contour, limite a l'interieur de la forme (clip-path)
+    pour correspondre a ce que la decoupe X Shape laissera voir."""
+    _, _, W, H = PIECES[piece]['fenetre']
+    forme = chemin(decoupe(piece))
+    traits = ' '.join(f'M{a[0]},{a[1]} L{b[0]},{b[1]}' for a, b in aretes_contour(piece))
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
+            f'<defs><clipPath id="forme"><path d="{forme}"/></clipPath></defs>'
+            f'<path d="{forme}" fill="{VERRE}"/>'
+            f'<path d="{traits}" fill="none" stroke="{CONTOUR}" stroke-width="{TRAIT}" '
+            f'stroke-linecap="round" clip-path="url(#forme)"/>'
+            f'</svg>\n')
+
+# ---------------------------------------------------------------- eww.yuck
 
 def afficher_geometrie():
     """Les lignes a recopier dans eww.yuck, dans la forme exacte attendue."""
-    for fen in FENETRES:
-        (x, y, w, h), dec = geometrie(fen)
-        print(f';; fenetre {fen}')
-        print(f'  :geometry (geometry :x "{x}px" :y "{y}px" :width "{w}px" '
-              f':height "{h}px" :anchor "top left")')
-        for p, (dx, dy, pw, ph) in dec.items():
-            print(f'    (hud_piece :nom "{p}" :dx {dx} :dy {dy} :w {pw} :h {ph})')
+    for piece, p in PIECES.items():
+        x, y, w, h = p['fenetre']
+        print(f';; (defwindow {fenetre_eww(piece)} ...)')
+        print(f'  :geometry (geometry :x "{x}px" :y "{y}px" :width "{w}px" :height "{h}px" :anchor "top left")')
+        print(f'  (hud_piece :nom "{piece}" :w {w} :h {h}))')
         print()
 
-def verifier(chemin):
-    """Compare les nombres recopies dans eww.yuck a ceux de ce fichier.
-    Une fenetre absente de eww.yuck n'est pas une erreur (etape pas encore
-    faite) ; un nombre different, si. Renvoie le code de sortie (0 ou 1)."""
-    with open(chemin, encoding='utf-8') as f:
+def verifier(chemin_yuck):
+    """Compare les nombres recopies dans eww.yuck a ceux de ce fichier, et
+    controle la symetrie de chaque fenetre. Renvoie le code de sortie (0 ou 1)."""
+    with open(chemin_yuck, encoding='utf-8') as f:
         # On ignore les lignes de commentaire (;;) : elles peuvent citer des
         # exemples qui ne sont pas le vrai code.
         texte = '\n'.join(l for l in f.read().splitlines()
                           if not l.lstrip().startswith(';'))
     erreurs = 0
-    for fen in FENETRES:
-        (x, y, w, h), dec = geometrie(fen)
-        # Corps de la fenetre : de "(defwindow <nom>" jusqu'au defwindow suivant.
+    # L'ancienne fenetre unique (12/09) ne doit plus exister.
+    if re.search(r'\(defwindow\s+hud(?=[\s\[])', texte):
+        print('ECART         fenetre "hud" (ancienne fenetre unique) encore presente')
+        erreurs = 1
+    for piece, p in PIECES.items():
+        fen = fenetre_eww(piece)
+        if not symetrique(piece):
+            print(f'ECART         {fen} : forme NON symetrique haut/bas (bogue picom : verre net)')
+            erreurs = 1
         debut = re.search(r'\(defwindow\s+' + re.escape(fen) + r'(?=[\s\[])', texte)
         if not debut:
-            print(f'--            fenetre {fen} : absente de eww.yuck (pas encore creee)')
+            print(f'ECART         {fen} : absente de eww.yuck')
+            erreurs = 1
             continue
+        # Corps de la fenetre : de "(defwindow <nom>" jusqu'au defwindow suivant.
         suite = re.search(r'\(defwindow\s', texte[debut.end():])
         corps = texte[debut.start(): debut.end() + suite.start() if suite else len(texte)]
-
-        g = re.search(r':geometry\s+\(geometry\s+:x\s+"(\d+)px"\s+:y\s+"(\d+)px"\s+'
+        g = re.search(r':geometry\s+\(geometry\s+:x\s+"(-?\d+)px"\s+:y\s+"(-?\d+)px"\s+'
                       r':width\s+"(\d+)px"\s+:height\s+"(\d+)px"', corps)
         lu = tuple(int(v) for v in g.groups()) if g else None
-        if lu == (x, y, w, h):
-            print(f'ok            fenetre {fen} : {x},{y} {w}x{h}')
+        m = re.search(r'\(hud_piece\s+:nom\s+"([\w-]+)"\s+:w\s+(\d+)\s+:h\s+(\d+)\s*\)', corps)
+        piece_lue = (m.group(1), int(m.group(2)), int(m.group(3))) if m else None
+        attendu = p['fenetre']
+        if lu == attendu and piece_lue == (piece, attendu[2], attendu[3]):
+            print(f'ok            {fen} : {attendu[0]},{attendu[1]} {attendu[2]}x{attendu[3]}, symetrique')
         else:
-            print(f'ECART         fenetre {fen} : eww.yuck {lu}, cadre.py {(x, y, w, h)}')
+            print(f'ECART         {fen} : eww.yuck {lu} {piece_lue}, cadre.py {attendu}')
             erreurs = 1
-
-        trouvees = {}
-        for m in re.finditer(r'\(hud_piece\s+:nom\s+"([\w-]+)"\s+:dx\s+(\d+)\s+:dy\s+(\d+)'
-                             r'\s+:w\s+(\d+)\s+:h\s+(\d+)\s*\)', corps):
-            if m.group(1) in trouvees:
-                print(f'ECART         piece {m.group(1)} : presente deux fois dans {fen}')
-                erreurs = 1
-            trouvees[m.group(1)] = tuple(int(v) for v in m.groups()[1:])
-        for p in sorted(set(dec) | set(trouvees)):
-            if trouvees.get(p) == dec.get(p):
-                print(f'ok              piece {p} : dx {dec[p][0]} dy {dec[p][1]} '
-                      f'{dec[p][2]}x{dec[p][3]}')
-            else:
-                print(f'ECART           piece {p} : eww.yuck {trouvees.get(p)}, '
-                      f'cadre.py {dec.get(p)}')
-                erreurs = 1
     return erreurs
 
 # ---------------------------------------------------------------- sortie
 if __name__ == '__main__':
-    quoi = sys.argv[1] if len(sys.argv) > 1 else 'clips'
-    if quoi == 'heure':       sys.stdout.write(heure())
-    elif quoi == 'sparklines':sys.stdout.write(sparklines())
-    elif quoi == 'meteo':     sys.stdout.write(meteo())
-    elif quoi == 'filigrane': sys.stdout.write(filigrane())
-    elif quoi == 'geometrie': afficher_geometrie()
+    quoi = sys.argv[1] if len(sys.argv) > 1 else 'geometrie'
+    if quoi in PIECES:
+        sys.stdout.write(svg_piece(quoi))
     elif quoi == 'decoupe':
-        for p, pts in decoupe('hud').items():
-            print(f'{p:<10} ' + ' '.join(f'{x},{y}' for x, y in pts))
+        for piece in PIECES:
+            for p in decoupe(piece):
+                print(f'{piece:<11} ' + ' '.join(f'{x},{y}' for x, y in p))
+    elif quoi == 'geometrie':
+        afficher_geometrie()
     elif quoi == 'verifier':
         defaut = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'eww.yuck')
         sys.exit(verifier(sys.argv[2] if len(sys.argv) > 2 else defaut))
     else:
-        print('heure     ', clip(heure_contour(), HEURE_W, HEURE_H))
-        print('sparklines', clip(spk_contour(), SPK_W, SPK_H))
-        print('meteo     ', clip(met_contour(), MET_W, MET_H))
+        sys.exit(f'usage : cadre.py {"|".join(PIECES)}|decoupe|geometrie|verifier')

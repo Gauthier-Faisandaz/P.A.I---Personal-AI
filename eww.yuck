@@ -27,8 +27,8 @@
 ;;   - variables y_mail y_veille            -> ui.sh
 ;;   - fenetre colonne                      -> ouvrir-colonne.sh
 ;;   - fenetre modale                       -> ui.sh, ouvrir-colonne.sh
-;;   - fenetre hud, widget hud_piece        -> ouvrir-hud.sh, cadre.py (verifier)
-;;   - fenetre hud (titre "Eww - hud")      -> decoupe-hud.py (NOM)
+;;   - fenetres hud-*, widget hud_piece     -> cadre.py (PIECES, verifier), ouvrir-hud.sh,
+;;                                            decoupe-hud.py, eww-watchdog.sh (titres "Eww - hud-*")
 
 
 ;; ==========================================================================
@@ -592,61 +592,66 @@
 
 
 ;; ==========================================================================
-;;  PANNEAU D'ANGLE (HUD)  (coin haut-gauche, lecture seule)
+;;  PANNEAU D'ANGLE (HUD)  (colonne d'hexagones, bord gauche, lecture seule)
 ;; ==========================================================================
 ;; Chantier INDEPENDANT de la colonne : rien ici n'est utilise par elle, et
 ;; rien au-dessus n'est utilise ici.
 ;;
-;; !! TAILLES ET POSITIONS RECOPIEES DE cadre.py : ne pas les modifier ici.
-;; cadre.py est la source unique de la geometrie du HUD (il dessine aussi les
-;; cadres, et fournira la decoupe de l'etape 3 : trois usages, un seul jeu de
-;; nombres). Pour changer une piece :
-;;   1. modifier cadre.py ;
-;;   2. recopier ici ce qu'affiche   python3 cadre.py geometrie
-;;   3. lancer   bash generer-cadres.sh   : il regenere les SVG et verifie
-;;      que les nombres de cette section sont bien ceux de cadre.py.
-;; Pourquoi une copie : eww ne sait pas lire un fichier Python, et refuse une
-;; variable dans :geometry (voir la colonne). La verification automatique
-;; remplace la discipline du "commentaire croise" : un oubli se voit.
+;; Trois fenetres, une par piece : hud-heure, hud-meteo, hud-sparklines.
+;; Pourquoi pas une seule fenetre (version du 12/09) : picom 10.2 a un bogue
+;; sur les fenetres decoupees -- il ne floute un pixel que si son symetrique
+;; haut/bas dans la fenetre fait aussi partie de la forme (voir cadre.py).
+;; Chaque piece est symetrique dans SA fenetre ; l'ensemble ne l'etait pas.
 ;;
-;; --- Une piece = une box de taille fixe, son cadre SVG en fond ------------
-;; Placement : un "overlay" empile tous ses enfants au meme endroit. Chaque
-;; piece s'y cale en haut a gauche (:halign/:valign "start"), puis sa marge
-;; (margin-left / margin-top) la decale de dx / dy. C'est un placement
-;; absolu, que eww n'offre pas directement (pas de widget "fixed").
-;; Le cadre est une image de FOND (background-image) : le contenu de
-;; l'etape 5 viendra en enfant de la box, dessine par-dessus.
-;; Taille : min-width / min-height en CSS, et SURTOUT PAS :width / :height.
-;; Constate a l'essai (12/09) : GTK3 prend la marge SUR la taille demandee
-;; par :width/:height. Une piece decalee de dy = 176 et haute de 330 ne
-;; faisait plus que 330 - 176 = 154 px, son cadre coupe en bas. min-width /
-;; min-height, eux, fixent la taille du contenu, marge en plus a l'exterieur.
+;; !! TAILLES ET POSITIONS RECOPIEES DE cadre.py : ne pas les modifier ici.
+;; Pour changer une piece : modifier cadre.py, recopier ici ce qu'affiche
+;;     python3 cadre.py geometrie
+;; puis lancer   bash generer-cadres.sh   : il regenere les SVG et verifie
+;; que les nombres de cette section sont ceux de cadre.py.
+;; Pourquoi une copie : eww ne sait pas lire un fichier Python, et refuse une
+;; variable dans :geometry (voir la colonne).
+;;
+;; y negatif (hud-heure) : la fenetre commence AU-DESSUS de l'ecran. C'est
+;; voulu : l'hexagone de l'heure est entier dans sa fenetre (symetrie, voir
+;; plus haut) et n'apparait que rogne par le bord haut de l'ecran. Verifie
+;; le 14/09 : eww et Openbox acceptent cette position.
+;;
+;; Forme : chaque fenetre recoit la forme exacte de ses hexagones (X Shape),
+;; posee de l'exterieur par decoupe-hud.py : eww ne sait pas le faire. Cette
+;; forme est perdue a chaque recreation des fenetres (eww reload,
+;; enregistrement de ce fichier...) : ouvrir-hud.sh la pose a l'ouverture,
+;; eww-watchdog.sh la repose (2 s max).
+;; Meme couche que la colonne (bg/dock) : sous les fenetres normales, au-dessus
+;; du fond d'ecran. Ouvertes par ouvrir-hud.sh (ecran de la colonne), lui-meme
+;; appele par start.sh et eww-watchdog.sh.
+;;
+;; --- Une piece = une box de la taille de sa fenetre, son cadre SVG en fond --
+;; Le cadre est une image de FOND (background-image) : le contenu des etapes
+;; suivantes viendra en enfant de la box, dessine par-dessus.
+;; Taille en min-width / min-height (CSS) plutot que :width / :height : en
+;; GTK3, :width/:height perdent la marge (constate le 12/09). Il n'y a plus de
+;; marge ici, mais la regle reste la bonne.
 ;; Chemin de l'image : EWW_CONFIG_DIR (variable fournie par eww) donne le
 ;; dossier de config sans ecrire "/home/gauthier" en dur. Il ne peut pas
 ;; aller dans eww.scss, qui ne connait pas les variables eww : d'ou le :style.
-(defwidget hud_piece [nom dx dy w h]
-  (box :class "hud-piece" :halign "start" :valign "start"
-       :style "min-width: ${w}px; min-height: ${h}px; margin-left: ${dx}px; margin-top: ${dy}px; background-image: url('${EWW_CONFIG_DIR}/hud/${nom}.svg');"))
+(defwidget hud_piece [nom w h]
+  (box :class "hud-piece"
+       :style "min-width: ${w}px; min-height: ${h}px; background-image: url('${EWW_CONFIG_DIR}/hud/${nom}.svg');"))
 
-;; --- Fenetre hud : les trois pieces a verre -------------------------------
-;; Rectangle englobant heure + sparklines + meteo. Le filigrane aura SA
-;; fenetre (etape 4) : c'est du trait nu, qu'on exclura du flou de picom.
-;; Decoupe : picom floute TOUTE la surface d'une fenetre. Pour que seules les
-;; pieces soient floutees (et pas les vides entre elles), la fenetre recoit
-;; la forme exacte des trois pieces (X Shape), posee de l'exterieur par
-;; decoupe-hud.py : eww ne sait pas le faire. Cette forme est perdue a chaque
-;; recreation de la fenetre (eww reload, enregistrement de ce fichier...) :
-;; ouvrir-hud.sh la pose a l'ouverture, eww-watchdog.sh la repose (2 s max).
-;; Meme couche que la colonne (bg/dock) : sous les fenetres normales, au-dessus
-;; du fond d'ecran. Ouverte par ouvrir-hud.sh (ecran de la colonne), lui-meme
-;; appele par start.sh et eww-watchdog.sh.
-(defwindow hud
+(defwindow hud-heure
   :monitor 0
-  :geometry (geometry :x "28px" :y "26px" :width "882px" :height "506px" :anchor "top left")
+  :geometry (geometry :x "0px" :y "-32px" :width "128px" :height "176px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (overlay
-    ;; 1er enfant : donne sa taille a l'overlay (toute la fenetre), transparent
-    (box)
-    (hud_piece :nom "heure"      :dx 0   :dy 0   :w 300 :h 160)
-    (hud_piece :nom "sparklines" :dx 312 :dy 54  :w 570 :h 106)
-    (hud_piece :nom "meteo"      :dx 0   :dy 176 :w 190 :h 330)))
+  (hud_piece :nom "heure" :w 128 :h 176))
+
+(defwindow hud-meteo
+  :monitor 0
+  :geometry (geometry :x "0px" :y "154px" :width "151px" :height "190px" :anchor "top left")
+  :stacking "bg" :windowtype "dock" :wm-ignore false
+  (hud_piece :nom "meteo" :w 151 :h 190))
+
+(defwindow hud-sparklines
+  :monitor 0
+  :geometry (geometry :x "12px" :y "355px" :width "80px" :height "294px" :anchor "top left")
+  :stacking "bg" :windowtype "dock" :wm-ignore false
+  (hud_piece :nom "sparklines" :w 80 :h 294))

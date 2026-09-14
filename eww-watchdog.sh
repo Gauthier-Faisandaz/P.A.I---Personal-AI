@@ -13,8 +13,8 @@
 # chaque fois. Ce script fait donc la meme chose que "killall eww" +
 # "bash start.sh" combines, automatiquement, des qu'un blocage est detecte.
 #
-# Seconde tache (panneau d'angle, 12/09) : a chaque tick, redonner sa
-# decoupe a la fenetre "hud" si elle l'a perdue (voir decoupe-hud.py).
+# Seconde tache (panneau d'angle) : a chaque tick, redonner leur decoupe aux
+# fenetres hud-* qui l'ont perdue (voir decoupe-hud.py).
 CACHE="$HOME/.cache/eww"
 LOCK="$CACHE/watchdog.lock"
 LOG="$CACHE/watchdog.log"
@@ -52,14 +52,20 @@ full_restart() {
   pkill -9 -x eww 2>/dev/null
   sleep 0.5
   : > "$CACHE/eww-daemon.out.log"
-  RUST_LOG=debug "$EWW" daemon > "$CACHE/eww-daemon.out.log" 2>&1 &
+  # 9>&- : le demon (et tout ce que lancent les ouvrir-*.sh) NE doit PAS
+  # heriter du descripteur 9, celui du verrou du surveillant. Sinon le demon,
+  # qui vit des heures, garde le verrou apres la mort du surveillant, et plus
+  # AUCUN surveillant ne peut redemarrer : flock attend 5 s et abandonne
+  # (constate le 14/09 : demon lance ici au boot, verrou tenu toute la
+  # journee, dashboard sans surveillant apres un simple relancement).
+  RUST_LOG=debug "$EWW" daemon 9>&- > "$CACHE/eww-daemon.out.log" 2>&1 &
   sleep 1.5
   # Meme ecran et meme geometrie que start.sh : ouvrir-colonne.sh relit
   # target_screen et geometrie.conf.
-  bash "$CFG/ouvrir-colonne.sh" 2>/dev/null
+  bash "$CFG/ouvrir-colonne.sh" 9>&- 2>/dev/null
   # Le panneau d'angle aussi (meme ecran, lu dans target_screen) : le demon
   # tue ci-dessus l'a emporte avec lui.
-  bash "$CFG/ouvrir-hud.sh" >/dev/null 2>&1
+  bash "$CFG/ouvrir-hud.sh" 9>&- >/dev/null 2>&1
   log "redemarrage termine"
 }
 
@@ -78,19 +84,27 @@ while true; do
     full_restart
   fi
 
-  # Decoupe du panneau d'angle : la forme de la fenetre "hud" est perdue a
+  # Decoupe du panneau d'angle : la forme des fenetres hud-* est perdue a
   # chaque recreation (eww reload, enregistrement de eww.yuck, close/open),
-  # et une fenetre recreee a un NOUVEL identifiant X. On relit donc
-  # l'identifiant a chaque tick (xwininfo : ~5 ms, programme en C) et on ne
-  # lance decoupe-hud.py (Python : ~25 ms) que s'il a change. Lancer Python a
-  # chaque tick coutait ~4 % d'un coeur en permanence (mesure le 12/09).
-  # hud_decoupe = identifiant dont la forme est CONFIRMEE (code 0) : en cas
-  # d'echec, il ne change pas, et le tick suivant reessaie.
-  # xwininfo et decoupe-hud.py parlent au serveur X, jamais au demon eww :
-  # un demon bloque ne les bloque pas.
-  hud="$(xwininfo -name 'Eww - hud' 2>/dev/null | awk '/Window id/ {print $4}')"
-  if [ -n "$hud" ] && [ "$hud" != "$hud_decoupe" ]; then
-    out="$(python3 -B "$CFG/decoupe-hud.py" --xid "$hud" 2>&1)" && hud_decoupe="$hud"
+  # et une fenetre recreee a un NOUVEL identifiant X.
+  # Signal de changement : _NET_CLIENT_LIST, la liste des fenetres gerees
+  # par Openbox (les hud-* en font partie : :wm-ignore false). Une seule
+  # propriete lue sur la racine : ~2,5 ms par tick. (Relever les hud-* avec
+  # "xwininfo -root -tree" en coutait ~24 : il parcourt et nomme les ~530
+  # fenetres X, mesure le 14/09.) decoupe-hud.py (Python, ~40 ms) ne tourne
+  # que si la liste a change : une fenetre recreee, mais aussi une
+  # application ouverte ou fermee -- c'est rare, et sans consequence (il ne
+  # touche pas une fenetre qui a deja sa forme).
+  # hud_liste = liste pour laquelle le travail est FAIT : code 0 (formes
+  # confirmees) ou 2 (HUD ferme, rien a faire -- sans ce cas, Python
+  # tournerait a chaque tick tant que le HUD est ferme). En cas d'echec, la
+  # liste memorisee ne change pas, et le tick suivant reessaie.
+  # xprop et decoupe-hud.py parlent au serveur X, jamais au demon eww : un
+  # demon bloque ne les bloque pas.
+  liste="$(xprop -root _NET_CLIENT_LIST 2>/dev/null)"
+  if [ "$liste" != "$hud_liste" ]; then
+    out="$(python3 -B "$CFG/decoupe-hud.py" 2>&1)"; code=$?
+    [ "$code" -eq 0 ] || [ "$code" -eq 2 ] && hud_liste="$liste"
     [ -n "$out" ] && log "hud : $out"
   fi
 
