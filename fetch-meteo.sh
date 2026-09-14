@@ -12,12 +12,17 @@
 # Sortie (une ligne JSON) :
 #   { "synchro": "10:29", "vieux": false,
 #     "temp": 18, "ressenti": 17, "lieu": "Hantay",
-#     "icone": "soleil" | "nuage" | "pluie" | "neige",
+#     "icone": "soleil" | "lune" | "nuage" | "pluie" | "neige",
 #     "condition": "Peu nuageux",          (coupee en lignes de 11 caracteres)
 #     "vent": "12 km/h", "humidite": "58 %",
 #     "lever": "07:15", "coucher": "20:20",
 #     "jours": [ { "jour": "mar.", "icone": "nuage", "max": 23, "min": 15 },
 #                ... 3 jours ] }
+#
+# Lune (demande du 14/09) : la nuit, le soleil du ciel degage ou peu
+# nuageux devient une lune. Open-Meteo dit s'il fait jour (is_day, ajoute a
+# l'URL du brief). Seule l'icone du TEMPS ACTUEL est concernee : les trois
+# jours de prevision sont des journees, ils gardent le soleil.
 #
 # Condition coupee en lignes courtes (11 caracteres max, aux espaces) pour
 # qu'un libelle long tienne dans l'hexagone central (80 px) : le retour a la
@@ -36,7 +41,7 @@
 
 LAT=50.5337          # Hantay
 LON=2.8673
-URL="${METEO_URL:-https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,weather_code&timezone=Europe/Paris&forecast_days=4}"
+URL="${METEO_URL:-https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,weather_code&timezone=Europe/Paris&forecast_days=4}"
 DERNIER="${METEO_DERNIER:-$HOME/.cache/eww/bus/meteo.json}"
 
 if [ -n "$METEO_EXEMPLE" ]; then
@@ -52,7 +57,7 @@ printf '%s' "$OUT" | python3 -c '
 import sys, json, os, math, tempfile, datetime
 
 source, dernier = sys.argv[1], sys.argv[2]
-ICONES = ("soleil", "nuage", "pluie", "neige")
+ICONES = ("soleil", "lune", "nuage", "pluie", "neige")
 JOURS = ("lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim.")
 
 # Table des codes meteo WMO (brief, section 4) : code -> (icone, libelle).
@@ -95,6 +100,8 @@ def depuis_open_meteo(r):
     if entier(cur.get("temperature_2m")) is None:
         return None
     ic, lib = WMO.get(entier(cur.get("weather_code")), ("nuage", ""))
+    if ic == "soleil" and entier(cur.get("is_day")) == 0:
+        ic = "lune"                           # la nuit : lune a la place du soleil
     jours = []
     for i in (1, 2, 3):                       # indice 0 = aujourd hui
         try:
