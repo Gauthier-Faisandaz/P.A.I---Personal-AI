@@ -7,7 +7,8 @@ Source UNIQUE de la geometrie : eww.yuck en recopie les nombres (section
 PANNEAU D'ANGLE), decoupe-hud.py en tire la forme X Shape de chaque fenetre,
 et "python3 cadre.py verifier" controle que tout concorde.
 
-Disposition (croquis de Gauthier du 14/09, 60 % de la hauteur de l'ecran),
+Disposition (croquis de Gauthier du 14/09 ; ~73 % de la hauteur de l'ecran
+depuis l'agrandissement de 20 % du meme jour, 60 % avant),
 tout empile verticalement, hexagones reguliers "pointe en haut" :
   - heure      : un grand hexagone, rogne par le haut et la gauche de l'ecran ;
   - meteo      : un nid d'abeille de 6 hexagones egaux (centre, haut-gauche,
@@ -123,26 +124,29 @@ def rentre(poly, d):
 # cellules : (cx, cy, R) = centre et rayon de chaque hexagone, en px, dans le
 # repere de l'ECRAN du dashboard (1920 x 1080 ; y < 0 = au-dessus de l'ecran).
 # La fenetre de chaque piece en est deduite (fenetre_de) : rien a recopier.
-# Axe commun : toutes les pieces sont centrees sur x = 52.
+# Axe commun : toutes les pieces sont centrees sur x = 62.
+# Taille : +20 % le 14/09 (demande de Gauthier : "trop petit"). Rayons
+# arrondis au pair le plus proche (sommets sur des pixels entiers) ; ecarts
+# entre les pieces : 12 et 13 px, 11 px entre deux sparklines.
 
-# Meteo : cellules de rayon 38 (66 x 76 px). Dans un nid d'abeille "pointe en
+# Meteo : cellules de rayon 46 (80 x 92 px). Dans un nid d'abeille "pointe en
 # haut", les voisins sont a (+-2a, 0) et (+-a, +-3b) du centre.
-RM = 38
-AM, BM = round(S3 * RM), RM // 2     # 33, 19
-MX, MY = 52, 249                     # centre du nid
+RM = 46
+AM, BM = round(S3 * RM), RM // 2     # 40, 23
+MX, MY = 62, 300                     # centre du nid
 
 PIECES = {
-    # Heure : rayon 88 (152 x 176 px), centre (52, 56) : l'hexagone depasse
-    # de 32 px au-dessus de l'ecran et de 24 px a gauche.
-    'heure': {'cellules': [(52, 56, 88)]},
+    # Heure : rayon 106 (184 x 212 px), centre (62, 67) : l'hexagone depasse
+    # de 39 px au-dessus de l'ecran et de 30 px a gauche.
+    'heure': {'cellules': [(62, 67, 106)]},
     'meteo': {'cellules': [(MX,          MY,          RM),     # centre
                            (MX + AM,     MY - 3 * BM, RM),     # haut-droit
                            (MX + 2 * AM, MY,          RM),     # droit
                            (MX + AM,     MY + 3 * BM, RM),     # bas-droit
                            (MX - AM,     MY + 3 * BM, RM),     # bas-gauche (a moitie rogne)
                            (MX - AM,     MY - 3 * BM, RM)]},   # haut-gauche (a moitie rogne)
-    # Sparklines : rayon 46 (80 x 92 px), empilees, 9 px entre deux.
-    'sparklines': {'cellules': [(52, 401, 46), (52, 502, 46), (52, 603, 46)]},
+    # Sparklines : rayon 56 (96 x 112 px), empilees, 11 px entre deux.
+    'sparklines': {'cellules': [(62, 484, 56), (62, 607, 56), (62, 730, 56)]},
 }
 
 def fenetre_de(cellules):

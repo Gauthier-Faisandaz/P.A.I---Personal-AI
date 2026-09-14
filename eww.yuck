@@ -664,19 +664,19 @@
 
 (defwindow hud-heure
   :monitor 0
-  :geometry (geometry :x "0px" :y "-35px" :width "131px" :height "182px" :anchor "top left")
+  :geometry (geometry :x "0px" :y "-42px" :width "157px" :height "218px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (hud_piece :nom "heure" :w 131 :h 182
+  (hud_piece :nom "heure" :w 157 :h 218
     (hud_heure)))
 
 (defwindow hud-meteo
   :monitor 0
-  :geometry (geometry :x "0px" :y "151px" :width "154px" :height "196px" :anchor "top left")
+  :geometry (geometry :x "0px" :y "182px" :width "185px" :height "236px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (hud_piece :nom "meteo" :w 154 :h 196))
+  (hud_piece :nom "meteo" :w 185 :h 236))
 
 (defwindow hud-sparklines
   :monitor 0
-  :geometry (geometry :x "9px" :y "352px" :width "86px" :height "300px" :anchor "top left")
+  :geometry (geometry :x "11px" :y "425px" :width "102px" :height "364px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (hud_piece :nom "sparklines" :w 86 :h 300))
+  (hud_piece :nom "sparklines" :w 102 :h 364))
