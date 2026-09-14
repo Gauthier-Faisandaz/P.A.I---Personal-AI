@@ -337,8 +337,12 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
    margin-top : la fenetre hud-heure commence 35 px AU-DESSUS de l'ecran
    (voir cadre.py) ; 73 px la placent dans la partie visible de l'hexagone,
    entre ses cotes verticaux (ecran y = 12 a 100). A revoir si l'hexagone
-   de l'heure change de taille ou de place dans cadre.py. */
-.hud-heure { margin-top: 73px; }
+   de l'heure change de taille ou de place dans cadre.py.
+   Nom de classe : jamais celui d'une fenetre (hud-heure, hud-meteo,
+   hud-sparklines). eww donne le nom de la fenetre a la fenetre GTK : une
+   regle .hud-heure s'appliquait a TOUTE la fenetre, et cette marge decalait
+   tout son contenu, cadre compris, de 73 px vers le bas (constate le 14/09). */
+.hud-heure-bloc { margin-top: 73px; }
 .hud-heure-hm {
   font-family: "DejaVu Sans Mono", monospace;
   font-size: 36px;

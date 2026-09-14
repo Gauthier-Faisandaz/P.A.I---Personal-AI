@@ -650,10 +650,14 @@
 
 ;; Placement : centre horizontalement dans la fenetre (0 a 131 px : c'est
 ;; aussi la partie VISIBLE de l'hexagone, rogne a gauche par l'ecran), et
-;; descendu d'une marge fixe (.hud-heure dans eww.scss), car le haut de la
-;; fenetre est au-dessus de l'ecran.
+;; descendu d'une marge fixe (.hud-heure-bloc dans eww.scss), car le haut de
+;; la fenetre est au-dessus de l'ecran.
+;; !! Classe "hud-heure-bloc" et SURTOUT PAS "hud-heure" : c'est le nom de la
+;; fenetre, et eww le donne aussi a la fenetre GTK. Une regle .hud-heure
+;; s'appliquait donc a toute la fenetre, et sa marge decalait tout le
+;; contenu -- cadre compris -- de 73 px vers le bas (constate le 14/09).
 (defwidget hud_heure []
-  (box :class "hud-heure" :orientation "v" :space-evenly false
+  (box :class "hud-heure-bloc" :orientation "v" :space-evenly false
        :hexpand true :halign "center" :valign "start"
     (label :class "hud-heure-hm" :text {hud_temps.heure ?: ''})
     (label :class "hud-heure-date" :text {hud_temps.date ?: ''})))
