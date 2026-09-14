@@ -730,8 +730,41 @@
   (hud_piece :nom "meteo" :w 206 :h 236
     (hud_meteo)))
 
+;; --- Sparklines (3 hexagones : CPU, RAM, NET) -----------------------------
+;; Donnees : la variable "sys" du BANDEAU (fetch-sys.sh, toutes les 5 s). Pas
+;; de second collecteur : fetch-sys.sh calcule CPU et reseau par DIFFERENCE
+;; avec l'appel precedent, deux appelants fausseraient les deux affichages.
+;; Depuis R4, sys porte aussi l'historique : sys.hist.cpu = [{"h": 0-100,
+;; "d": derniere ?}, ...], les 20 dernieres mesures, deja normalisees sur
+;; leur propre fenetre (voir fetch-sys.sh).
+;; Une barre par mesure : un widget, pas une image (brief, section 5 : rien a
+;; ecrire sur disque, rien a recharger). Hauteur : h (0-100) * 0,22 + 1 px.
+;; Rouge (#ff6b6b) au-dela de 70 % : la valeur ET les barres (brief, seuil
+;; 70). C'est la seule couleur du HUD : la couleur reste reservee au sens.
+;; Classes "spk-*" : jamais "hud-sparklines", le nom de la fenetre (voir R2).
+(defwidget spark [nom v serie]
+  (box :orientation "v" :space-evenly false :halign "center"
+    (label :class "spk-nom" :text nom)
+    (label :class "spk-val ${v > 70 ? 'alerte' : ''}" :text "${v}%")
+    (box :class "spk-barres ${v > 70 ? 'alerte' : ''}" :orientation "h" :space-evenly false
+         :spacing 1 :halign "center"
+      (for b in serie
+        (box :class "spk-barre ${b.d ? 'maintenant' : ''}" :valign "end"
+             :style "min-height: ${round(b.h * 0.22, 0) + 1}px;")))))
+
+(defwidget hud_sparklines []
+  (overlay
+    (box)
+    (hud_case :nom "sparklines-cpu" :x 3 :y 3 :w 96 :h 112
+      (spark :nom "CPU" :v {sys.cpu ?: 0} :serie {sys.hist.cpu ?: '[]'}))
+    (hud_case :nom "sparklines-ram" :x 3 :y 126 :w 96 :h 112
+      (spark :nom "RAM" :v {sys.ram ?: 0} :serie {sys.hist.ram ?: '[]'}))
+    (hud_case :nom "sparklines-net" :x 3 :y 249 :w 96 :h 112
+      (spark :nom "NET" :v {sys.net ?: 0} :serie {sys.hist.net ?: '[]'}))))
+
 (defwindow hud-sparklines
   :monitor 0
   :geometry (geometry :x "41px" :y "429px" :width "102px" :height "364px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (hud_piece :nom "sparklines" :w 102 :h 364))
+  (hud_piece :nom "sparklines" :w 102 :h 364
+    (hud_sparklines)))

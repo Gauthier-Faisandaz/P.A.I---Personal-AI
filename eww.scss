@@ -384,3 +384,30 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   color: white;
 }
 .meteo-detail { font-weight: normal; }
+
+/* --- Panneau d'angle : sparklines (CPU, RAM, NET) ---------------------- */
+/* Une barre par mesure (widget, pas une image) : 3 px de large, 1 px
+   d'ecart, 20 barres = 79 px dans un hexagone de 96 px (cellule de rayon
+   56, cadre.py). Hauteur donnee par eww.yuck (1 a 23 px) ; .spk-barres
+   reserve toujours ces 23 px, pour que la mise en page ne saute pas.
+   Les barres passees sont a .55, la derniere ("maintenant") en blanc plein.
+   Au-dela de 70 % (.alerte) : valeur et barres en #ff6b6b, le rouge du
+   dashboard (seul ecart au blanc). Noms "spk-*" : jamais "hud-sparklines",
+   le nom de la fenetre (voir .hud-heure-bloc). */
+.spk-nom {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.spk-val {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+}
+.spk-val.alerte { color: #ff6b6b; }
+.spk-barres { min-height: 23px; margin-top: 3px; }
+.spk-barre { min-width: 3px; background-color: rgba(255, 255, 255, 0.55); }
+.spk-barre.maintenant { background-color: white; }
+.spk-barres.alerte .spk-barre { background-color: rgba(255, 107, 107, 0.6); }
+.spk-barres.alerte .spk-barre.maintenant { background-color: #ff6b6b; }

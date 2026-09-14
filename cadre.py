@@ -205,7 +205,8 @@ PIECES = {
                            (MX - AM,     MY + 3 * BM, RM),     # bas-gauche
                            (MX - AM,     MY - 3 * BM, RM)],    # haut-gauche
               'noms': ['centre', 'haut-droit', 'droit', 'bas-droit', 'bas-gauche', 'haut-gauche']},
-    'sparklines': {'cellules': [(AXE, SY + i * (2 * RS + ECART_SPK), RS) for i in range(3)]},
+    'sparklines': {'cellules': [(AXE, SY + i * (2 * RS + ECART_SPK), RS) for i in range(3)],
+                   'noms': ['cpu', 'ram', 'net']},
 }
 
 def fenetre_de(cellules):
