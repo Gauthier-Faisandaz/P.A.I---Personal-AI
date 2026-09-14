@@ -43,12 +43,19 @@ contour, le trait devient un escalier lui aussi (constate le 14/09). D'ou :
     tout ca -- sauf au bord gauche de l'ecran, ou l'on coupe net (une coupe
     verticale ne fait pas d'escalier, et x < 0 est interdit, voir plus haut).
 
+MEME TRAIT QUE LA COLONNE (demande du 14/09) : la bordure des panneaux de
+la colonne fait 1 px, a .25 d'opacite, et tombe sur une colonne de pixels
+entiere : elle est nette. Le contour des hexagones fait donc 1 px lui aussi,
+trace RETRAIT = 0,5 px a l'interieur de chaque hexagone : les sommets sont
+sur des pixels entiers, un trait centre dessus s'etalerait sur deux colonnes
+de pixels (flou) ; decale d'un demi-pixel, il tombe au milieu d'une seule.
+Les cotes verticaux sont ainsi aussi nets que la bordure de la colonne ; les
+cotes obliques restent adoucis (ils ne peuvent pas suivre la grille), a la
+meme finesse.
+
 Couleurs (tokens de eww.scss, identiques a la colonne de droite) :
     verre    rgba(255,255,255,.10)   = .panel background-color
-    contour  rgba(255,255,255,.25)   = .panel border (demande du 14/09 : meme
-                                     trait que la colonne ; 1,4 px et non 1 px,
-                                     car un trait oblique lisse sur 1 px parait
-                                     plus pale qu'une bordure droite)
+    contour  rgba(255,255,255,.25)   = .panel border
 
 ATTENTION : ce fichier genere du SVG consomme par librsvg. Rester en ASCII
 dans les chaines produites (les commentaires Python n'y vont pas).
@@ -69,7 +76,8 @@ import sys
 
 VERRE   = 'rgba(255,255,255,.10)'
 CONTOUR = 'rgba(255,255,255,.25)'
-TRAIT = 1.4          # epaisseur du contour (px), trait entier et lisse
+TRAIT = 1            # epaisseur du contour (px), comme .panel border ($bordure)
+RETRAIT = 0.5        # le contour est trace a 0,5 px a l'interieur (voir MEME TRAIT)
 MARGE = 3            # vide autour des hexagones dans leur fenetre (px)
 DILATATION = 2       # forme X Shape = hexagones de rayon R + 2 (~1,7 px de plus)
 
@@ -84,6 +92,31 @@ def hexa(cx, cy, R):
     a, b = round(S3 * R), R // 2
     return [(cx, cy - R), (cx + a, cy - b), (cx + a, cy + b),
             (cx, cy + R), (cx - a, cy + b), (cx - a, cy - b)]
+
+def rentre(poly, d):
+    """Le polygone convexe `poly`, chaque cote decale de d px vers l'interieur.
+    Chaque cote devient une droite parallele ; les nouveaux sommets sont les
+    intersections des droites voisines, pour que les cotes se rejoignent
+    exactement aux coins."""
+    n = len(poly)
+    cx = sum(x for x, _ in poly) / n
+    cy = sum(y for _, y in poly) / n
+    droites = []
+    for i in range(n):
+        (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % n]
+        nx, ny = y2 - y1, x1 - x2                      # normale au cote
+        l = math.hypot(nx, ny)
+        nx, ny = nx / l, ny / l
+        if (cx - x1) * nx + (cy - y1) * ny < 0:        # la tourner vers le centre
+            nx, ny = -nx, -ny
+        droites.append(((x1 + nx * d, y1 + ny * d), (x2 - x1, y2 - y1)))
+    sommets = []
+    for i in range(n):                                 # sommet i = cote i-1 x cote i
+        (px, py), (ux, uy) = droites[i - 1]
+        (qx, qy), (vx, vy) = droites[i]
+        t = ((qx - px) * vy - (qy - py) * vx) / (ux * vy - uy * vx)
+        sommets.append((px + t * ux, py + t * uy))
+    return sommets
 
 # ---------------------------------------------------------------- geometrie
 # Chaque piece = une fenetre eww, nommee "hud-<piece>".
@@ -152,29 +185,36 @@ def symetrique(piece):
 # ---------------------------------------------------------------- SVG
 
 def chemin(polygones):
-    return ' '.join('M' + ' L'.join(f'{x},{y}' for x, y in p) + ' Z' for p in polygones)
+    return ' '.join('M' + ' L'.join(f'{x:g},{y:g}' for x, y in p) + ' Z' for p in polygones)
 
-def aretes_contour(piece):
-    """Bord exterieur de la piece : les aretes des hexagones, sauf celles que
-    partagent deux cellules voisines (interieures : pas de trait entre elles)."""
+def segments_contour(piece):
+    """Segments du contour : le bord exterieur de la piece (les cotes que
+    partagent deux cellules voisines sont interieurs : pas de trait entre
+    elles), chacun pris sur l'hexagone RENTRE de sa cellule (voir MEME TRAIT)."""
+    hexagones = [hexa(cx, cy, R) for cx, cy, R in cellules_locales(piece)]
     compte = {}
-    for cx, cy, R in cellules_locales(piece):
-        p = hexa(cx, cy, R)
+    for p in hexagones:
         for i in range(6):
             cle = frozenset((p[i], p[(i + 1) % 6]))
             compte[cle] = compte.get(cle, 0) + 1
-    return [tuple(sorted(cle)) for cle, n in compte.items() if n == 1]
+    segments = []
+    for p in hexagones:
+        q = rentre(p, RETRAIT)
+        for i in range(6):
+            if compte[frozenset((p[i], p[(i + 1) % 6]))] == 1:
+                segments.append((q[i], q[(i + 1) % 6]))
+    return segments
 
 def svg_piece(piece):
     """Cadre d'une piece, a la taille de sa fenetre : verre sur les hexagones
     (taille reelle, pas agrandie), puis le contour, trait entier et lisse."""
     _, _, W, H = PIECES[piece]['fenetre']
     cellules = [hexa(cx, cy, R) for cx, cy, R in cellules_locales(piece)]
-    traits = ' '.join(f'M{a[0]},{a[1]} L{b[0]},{b[1]}' for a, b in aretes_contour(piece))
+    traits = ' '.join(f'M{a[0]:.2f},{a[1]:.2f} L{b[0]:.2f},{b[1]:.2f}' for a, b in segments_contour(piece))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
             f'<path d="{chemin(cellules)}" fill="{VERRE}"/>'
             f'<path d="{traits}" fill="none" stroke="{CONTOUR}" stroke-width="{TRAIT}" '
-            f'stroke-linecap="round" stroke-linejoin="round"/>'
+            f'stroke-linecap="square"/>'
             f'</svg>\n')
 
 # ---------------------------------------------------------------- eww.yuck
