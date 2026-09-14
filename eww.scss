@@ -334,24 +334,24 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 
 /* --- Panneau d'angle : heure (hexagone du haut) ------------------------ */
 /* Meme police et memes blancs que la colonne (texte white / .75).
-   margin-top : la fenetre hud-heure commence 42 px AU-DESSUS de l'ecran
-   (voir cadre.py) ; 88 px placent le texte a y = 46 sur l'ecran, dans la
-   partie visible de l'hexagone, entre ses cotes verticaux (ecran y = 14 a
-   120). A revoir si l'hexagone de l'heure change de taille ou de place dans
-   cadre.py (derniere fois : +20 % le 14/09 ; 36 px -> 43, 13 px -> 16).
+   margin-top : la fenetre hud-heure commence 65 px AU-DESSUS de l'ecran
+   (voir cadre.py) ; 87 px placent le texte a y = 22 sur l'ecran, dans la
+   partie visible de l'hexagone, entre ses cotes verticaux (ecran y = -2 a
+   118). A revoir si l'hexagone de l'heure change de taille ou de place dans
+   cadre.py (derniere fois le 14/09 : rayon 120, texte 48 px / date 18 px).
    Nom de classe : jamais celui d'une fenetre (hud-heure, hud-meteo,
    hud-sparklines). eww donne le nom de la fenetre a la fenetre GTK : une
    regle .hud-heure s'appliquait a TOUTE la fenetre, et cette marge decalait
    tout son contenu, cadre compris, de 73 px vers le bas (constate le 14/09). */
-.hud-heure-bloc { margin-top: 88px; }
+.hud-heure-bloc { margin-top: 87px; }
 .hud-heure-hm {
   font-family: "DejaVu Sans Mono", monospace;
-  font-size: 43px;
+  font-size: 48px;
   font-weight: bold;
   color: white;
 }
 .hud-heure-date {
   font-family: "DejaVu Sans Mono", monospace;
-  font-size: 16px;
+  font-size: 18px;
   color: rgba(255, 255, 255, 0.75);
 }

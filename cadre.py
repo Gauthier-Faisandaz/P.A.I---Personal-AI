@@ -10,10 +10,11 @@ et "python3 cadre.py verifier" controle que tout concorde.
 Disposition (croquis de Gauthier du 14/09 ; ~73 % de la hauteur de l'ecran
 depuis l'agrandissement de 20 % du meme jour, 60 % avant),
 tout empile verticalement, hexagones reguliers "pointe en haut" :
-  - heure      : un grand hexagone, rogne par le haut et la gauche de l'ecran ;
+  - heure      : un grand hexagone, rogne par le haut et la gauche de l'ecran,
+                 qui CACHE le coin haut-gauche de l'ecran (voir COIN) ;
   - meteo      : un nid d'abeille de 6 hexagones egaux (centre, haut-gauche,
                  haut-droit, droit, bas-droit, bas-gauche), qui ne forment
-                 qu'une seule piece ; ceux de gauche sont rognes par l'ecran ;
+                 qu'une seule piece, detachee du bord de l'ecran ;
   - sparklines : 3 hexagones empiles.
 Aucune decoration pour l'instant (demande du 14/09) : verre + contour.
 
@@ -31,6 +32,13 @@ horizontal, sinon des morceaux du verre restent nets. D'ou :
     Surtout pas x < 0 : a gauche de l'ecran HDMI se trouve l'ecran du
     portable (il commence en y = 321), la fenetre y deborderait.
 "python3 cadre.py verifier" controle cette symetrie.
+
+COIN (demande du 14/09) : toute la partie haut-gauche de l'hexagone de
+l'heure doit etre hors de l'ecran, sans laisser voir un bout de fond d'ecran
+dans le coin. Il faut donc que le coin (0, 0) de l'ecran soit A L'INTERIEUR
+de l'hexagone : son cote gauche a x < 0, et son arete haut-gauche au-dessus
+du coin. "python3 cadre.py verifier" controle que le coin est dedans, a au
+moins COIN_MARGE px de chaque arete.
 
 BORDS LISSES : la forme X Shape est binaire (un pixel est dedans ou dehors),
 un bord oblique y devient donc un escalier. Si elle coupe le trait du
@@ -67,7 +75,7 @@ Usage :
     python3 cadre.py sparklines   > hud/sparklines.svg
     python3 cadre.py decoupe                   # polygones X Shape (repere de chaque fenetre)
     python3 cadre.py geometrie                 # les lignes a recopier dans eww.yuck
-    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? fenetres symetriques ?
+    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? symetrie ? coin cache ?
 (generer-cadres.sh fait les SVG et la verification d'un coup.)
 """
 import math
@@ -81,6 +89,7 @@ TRAIT = 1            # epaisseur du contour (px), comme .panel border ($bordure)
 RETRAIT = 0.5        # le contour est trace a 0,5 px a l'interieur (voir MEME TRAIT)
 MARGE = 3            # vide autour des hexagones dans leur fenetre (px)
 DILATATION = 2       # forme X Shape = hexagones de rayon R + 2 (~1,7 px de plus)
+COIN_MARGE = 6       # le coin de l'ecran doit etre a >= 6 px des aretes de l'heure
 
 S3 = math.sqrt(3) / 2
 
@@ -119,34 +128,67 @@ def rentre(poly, d):
         sommets.append((px + t * ux, py + t * uy))
     return sommets
 
+def distance_interieure(poly, x, y):
+    """Distance du point (x, y) au bord du polygone convexe `poly` : positive
+    si le point est dedans (distance a l'arete la plus proche), negative s'il
+    est dehors."""
+    n = len(poly)
+    cx = sum(p[0] for p in poly) / n
+    cy = sum(p[1] for p in poly) / n
+    d = float('inf')
+    for i in range(n):
+        (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % n]
+        nx, ny = y2 - y1, x1 - x2
+        l = math.hypot(nx, ny)
+        nx, ny = nx / l, ny / l
+        if (cx - x1) * nx + (cy - y1) * ny < 0:        # normale vers l'interieur
+            nx, ny = -nx, -ny
+        d = min(d, (x - x1) * nx + (y - y1) * ny)
+    return d
+
 # ---------------------------------------------------------------- geometrie
 # Chaque piece = une fenetre eww, nommee "hud-<piece>".
 # cellules : (cx, cy, R) = centre et rayon de chaque hexagone, en px, dans le
 # repere de l'ECRAN du dashboard (1920 x 1080 ; y < 0 = au-dessus de l'ecran).
 # La fenetre de chaque piece en est deduite (fenetre_de) : rien a recopier.
-# Axe commun : toutes les pieces sont centrees sur x = 62.
-# Taille : +20 % le 14/09 (demande de Gauthier : "trop petit"). Rayons
-# arrondis au pair le plus proche (sommets sur des pixels entiers) ; ecarts
-# entre les pieces : 12 et 13 px, 11 px entre deux sparklines.
+# Les pieces sont placees EN CASCADE : la meteo sous l'heure, les sparklines
+# sous la meteo. Agrandir une piece decale les suivantes, sans rien recalculer.
+# Rayons pairs (sommets sur des pixels entiers).
+
+# Axe commun : toutes les pieces sont centrees sur x = AXE. Pour decaler la
+# colonne, changer AXE et relancer generer-cadres.sh. 92 (14/09) : la meteo
+# ne touche plus le bord de l'ecran (ses cellules de gauche commencent a
+# AXE - 80 = 12 px, soit ECART).
+AXE = 92
+ECART = 12           # entre deux pieces (px)
+ECART_SPK = 11       # entre deux sparklines (px)
+
+# Heure : rayon 120 (208 x 240 px ; 106 avant le 14/09, 88 avant +20 %).
+# Plus grand que le reste pour rester rogne a gauche (cote gauche a
+# AXE - 104 = -12) et cacher le coin (voir COIN) : centre a HY = 58, son
+# arete haut-gauche croise le bord gauche de l'ecran a y ~ -9.
+RH, HY = 120, 58
 
 # Meteo : cellules de rayon 46 (80 x 92 px). Dans un nid d'abeille "pointe en
 # haut", les voisins sont a (+-2a, 0) et (+-a, +-3b) du centre.
 RM = 46
 AM, BM = round(S3 * RM), RM // 2     # 40, 23
-MX, MY = 62, 300                     # centre du nid
+MX = AXE
+MY = HY + RH + ECART + 3 * BM + RM   # centre du nid : sous l'heure
+
+# Sparklines : rayon 56 (96 x 112 px), empilees sous la meteo.
+RS = 56
+SY = MY + 3 * BM + RM + ECART + RS   # centre de la premiere
 
 PIECES = {
-    # Heure : rayon 106 (184 x 212 px), centre (62, 67) : l'hexagone depasse
-    # de 39 px au-dessus de l'ecran et de 30 px a gauche.
-    'heure': {'cellules': [(62, 67, 106)]},
+    'heure': {'cellules': [(AXE, HY, RH)]},
     'meteo': {'cellules': [(MX,          MY,          RM),     # centre
                            (MX + AM,     MY - 3 * BM, RM),     # haut-droit
                            (MX + 2 * AM, MY,          RM),     # droit
                            (MX + AM,     MY + 3 * BM, RM),     # bas-droit
-                           (MX - AM,     MY + 3 * BM, RM),     # bas-gauche (a moitie rogne)
-                           (MX - AM,     MY - 3 * BM, RM)]},   # haut-gauche (a moitie rogne)
-    # Sparklines : rayon 56 (96 x 112 px), empilees, 11 px entre deux.
-    'sparklines': {'cellules': [(62, 484, 56), (62, 607, 56), (62, 730, 56)]},
+                           (MX - AM,     MY + 3 * BM, RM),     # bas-gauche
+                           (MX - AM,     MY - 3 * BM, RM)]},   # haut-gauche
+    'sparklines': {'cellules': [(AXE, SY + i * (2 * RS + ECART_SPK), RS) for i in range(3)]},
 }
 
 def fenetre_de(cellules):
@@ -185,6 +227,11 @@ def symetrique(piece):
     h = PIECES[piece]['fenetre'][3]
     cellules = set(cellules_locales(piece))
     return cellules == {(cx, h - cy, R) for cx, cy, R in cellules}
+
+def marge_coin():
+    """De combien de px le coin (0, 0) de l'ecran est a l'interieur de
+    l'hexagone de l'heure (negatif : il depasse, un bout de fond se voit)."""
+    return distance_interieure(hexa(*PIECES['heure']['cellules'][0]), 0, 0)
 
 # ---------------------------------------------------------------- SVG
 
@@ -234,7 +281,8 @@ def afficher_geometrie():
 
 def verifier(chemin_yuck):
     """Compare les nombres recopies dans eww.yuck a ceux de ce fichier, et
-    controle la symetrie de chaque fenetre. Renvoie le code de sortie (0 ou 1)."""
+    controle la symetrie de chaque fenetre et le coin cache par l'heure.
+    Renvoie le code de sortie (0 ou 1)."""
     with open(chemin_yuck, encoding='utf-8') as f:
         # On ignore les lignes de commentaire (;;) : elles peuvent citer des
         # exemples qui ne sont pas le vrai code.
@@ -244,6 +292,13 @@ def verifier(chemin_yuck):
     # L'ancienne fenetre unique (12/09) ne doit plus exister.
     if re.search(r'\(defwindow\s+hud(?=[\s\[])', texte):
         print('ECART         fenetre "hud" (ancienne fenetre unique) encore presente')
+        erreurs = 1
+    coin = marge_coin()
+    if coin >= COIN_MARGE:
+        print(f'ok            coin haut-gauche de l\'ecran cache par l\'heure ({coin:.1f} px a l\'interieur)')
+    else:
+        print(f'ECART         coin haut-gauche : {coin:.1f} px a l\'interieur de l\'heure '
+              f'(il en faut {COIN_MARGE}) : un bout de fond d\'ecran se voit dans le coin')
         erreurs = 1
     for piece, p in PIECES.items():
         fen = fenetre_eww(piece)
