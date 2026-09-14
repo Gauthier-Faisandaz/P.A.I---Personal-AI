@@ -5,8 +5,9 @@ long du bord gauche de l'ecran, les cadres SVG qui la dessinent, et les
 masques de decoupe tires de ces cadres.
 
 Source UNIQUE de la geometrie : eww.yuck en recopie les nombres (section
-PANNEAU D'ANGLE), decoupe-hud.py applique les masques (hud/<piece>.masque),
-et "python3 cadre.py verifier" controle que tout concorde.
+PANNEAU D'ANGLE : fenetres et cases), decoupe-hud.py applique les masques
+(hud/<piece>.masque), et "python3 cadre.py verifier" controle que tout
+concorde.
 
 Disposition (croquis de Gauthier du 14/09 ; ~73 % de la hauteur de l'ecran
 depuis l'agrandissement de 20 % du meme jour, 60 % avant),
@@ -69,6 +70,11 @@ Les cotes verticaux sont ainsi aussi nets que la bordure de la colonne ; les
 cotes obliques restent adoucis (ils ne peuvent pas suivre la grille), a la
 meme finesse.
 
+CASES (R3, 14/09) : pour les pieces a plusieurs hexagones (la meteo), chaque
+hexagone porte son propre contenu. cases() donne, pour chacun, son rectangle
+dans la fenetre ; eww.yuck les recopie (widget hud_case), et
+"python3 cadre.py verifier" controle la copie.
+
 Couleurs (tokens de eww.scss, identiques a la colonne de droite) :
     verre    rgba(255,255,255,.10)   = .panel background-color
     contour  rgba(255,255,255,.25)   = .panel border
@@ -81,7 +87,7 @@ Usage :
     python3 cadre.py masque heure > hud/heure.masque     (rendu du SVG : GTK requis)
     python3 cadre.py decoupe                   # resume des masques enregistres
     python3 cadre.py geometrie                 # les lignes a recopier dans eww.yuck
-    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? symetrie ? coin ? masques ?
+    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? symetrie ? coin ? masques ? cases ?
 (generer-cadres.sh fait les SVG, les masques et la verification d'un coup.)
 """
 import math
@@ -159,6 +165,8 @@ def distance_interieure(poly, x, y):
 # cellules : (cx, cy, R) = centre et rayon de chaque hexagone, en px, dans le
 # repere de l'ECRAN du dashboard (1920 x 1080 ; y < 0 = au-dessus de l'ecran).
 # La fenetre de chaque piece en est deduite (fenetre_de) : rien a recopier.
+# noms (facultatif) : un nom par cellule, pour les pieces dont chaque
+# hexagone a son contenu (voir CASES).
 # Les pieces sont placees EN CASCADE : la meteo sous l'heure, les sparklines
 # sous la meteo. Agrandir une piece decale les suivantes, sans rien recalculer.
 # Rayons pairs (sommets sur des pixels entiers).
@@ -195,7 +203,8 @@ PIECES = {
                            (MX + 2 * AM, MY,          RM),     # droit
                            (MX + AM,     MY + 3 * BM, RM),     # bas-droit
                            (MX - AM,     MY + 3 * BM, RM),     # bas-gauche
-                           (MX - AM,     MY - 3 * BM, RM)]},   # haut-gauche
+                           (MX - AM,     MY - 3 * BM, RM)],    # haut-gauche
+              'noms': ['centre', 'haut-droit', 'droit', 'bas-droit', 'bas-gauche', 'haut-gauche']},
     'sparklines': {'cellules': [(AXE, SY + i * (2 * RS + ECART_SPK), RS) for i in range(3)]},
 }
 
@@ -221,6 +230,14 @@ def cellules_locales(piece):
     """Les cellules dans le repere de leur FENETRE."""
     x0, y0 = PIECES[piece]['fenetre'][:2]
     return [(cx - x0, cy - y0, R) for cx, cy, R in PIECES[piece]['cellules']]
+
+def cases(piece):
+    """Pour une piece dont les hexagones ont chacun leur contenu : le
+    rectangle de chaque hexagone dans sa fenetre, sous son nom global
+    "<piece>-<nom>" (ex. "meteo-centre"). Renvoie [(nom, x, y, l, h), ...]."""
+    noms = PIECES[piece].get('noms', [])
+    return [(f'{piece}-{nom}', cx - round(S3 * R), cy - R, 2 * round(S3 * R), 2 * R)
+            for nom, (cx, cy, R) in zip(noms, cellules_locales(piece))]
 
 def symetrique(piece):
     """La regle de picom (voir en tete) : chaque cellule a-t-elle sa jumelle
@@ -330,12 +347,14 @@ def afficher_geometrie():
         print(f';; (defwindow {fenetre_eww(piece)} ...)')
         print(f'  :geometry (geometry :x "{x}px" :y "{y}px" :width "{w}px" :height "{h}px" :anchor "top left")')
         print(f'  (hud_piece :nom "{piece}" :w {w} :h {h}))')
+        for nom, cx, cy, l, h in cases(piece):
+            print(f'    (hud_case :nom "{nom}" :x {cx} :y {cy} :w {l} :h {h}')
         print()
 
 def verifier(chemin_yuck):
     """Compare les nombres recopies dans eww.yuck a ceux de ce fichier, et
-    controle la symetrie de chaque fenetre, le coin cache par l'heure et les
-    masques enregistres. Renvoie le code de sortie (0 ou 1)."""
+    controle la symetrie de chaque fenetre, le coin cache par l'heure, les
+    masques enregistres et les cases. Renvoie le code de sortie (0 ou 1)."""
     with open(chemin_yuck, encoding='utf-8') as f:
         # On ignore les lignes de commentaire (;;) : elles peuvent citer des
         # exemples qui ne sont pas le vrai code.
@@ -371,6 +390,16 @@ def verifier(chemin_yuck):
         except (OSError, ValueError, IndexError) as e:
             print(f'ECART         hud/{piece}.masque illisible ({e}) -- relancer generer-cadres.sh')
             erreurs = 1
+        # Cases recopiees dans eww.yuck (widget hud_case), pour les pieces qui en ont.
+        for nom, cx, cy, l, h in cases(piece):
+            m = re.search(r'\(hud_case\s+:nom\s+"' + re.escape(nom) + r'"\s+:x\s+(\d+)\s+:y\s+(\d+)'
+                          r'\s+:w\s+(\d+)\s+:h\s+(\d+)\b', texte)
+            lu = tuple(int(v) for v in m.groups()) if m else None
+            if lu == (cx, cy, l, h):
+                print(f'ok              case {nom} : {cx},{cy} {l}x{h}')
+            else:
+                print(f'ECART           case {nom} : eww.yuck {lu}, cadre.py {(cx, cy, l, h)}')
+                erreurs = 1
         debut = re.search(r'\(defwindow\s+' + re.escape(fen) + r'(?=[\s\[])', texte)
         if not debut:
             print(f'ECART         {fen} : absente de eww.yuck')

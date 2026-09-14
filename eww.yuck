@@ -669,11 +669,66 @@
   (hud_piece :nom "heure" :w 199 :h 246
     (hud_heure)))
 
+;; --- Meteo (nid d'abeille de 6 hexagones) ---------------------------------
+;; hud_meteo : JSON de fetch-meteo.sh (voir ce script : webhook n8n, fichier
+;; d'exemple tant que l'URL est vide, derniere reponse gardee si n8n est
+;; injoignable). 15 min : la meteo ne change pas plus vite, et Open-Meteo est
+;; un service gratuit, sans cle : inutile de le marteler (brief).
+(defpoll hud_meteo :interval "15m" :initial "{}"
+  "bash ~/.config/eww/fetch-meteo.sh")
+
+;; Une case = le rectangle d'un hexagone dans sa fenetre ; son contenu y est
+;; centre. Placement comme la piece de l'heure : marge a gauche et en haut.
+;; !! Positions RECOPIEES de cadre.py (python3 cadre.py geometrie), verifiees
+;; par generer-cadres.sh : ne pas les modifier ici.
+(defwidget hud_case [nom x y w h]
+  (box :class "hud-case" :halign "start" :valign "start"
+       :style "min-width: ${w}px; min-height: ${h}px; margin-left: ${x}px; margin-top: ${y}px;"
+    (box :orientation "v" :space-evenly false :hexpand true :vexpand true
+         :halign "center" :valign "center"
+      (children))))
+
+;; Un jour de prevision : "mar." + petite icone, puis "max/min".
+(defwidget meteo_jour [j]
+  (box :orientation "v" :space-evenly false
+    (box :orientation "h" :space-evenly false :halign "center" :spacing 3
+      (label :class "meteo-jour" :text {j.jour ?: ''})
+      (image :path "${EWW_CONFIG_DIR}/hud/icones/${j.icone ?: 'nuage'}.svg"
+             :image-width 14 :image-height 14))
+    (label :class "meteo-jour-temp" :text "${j.max ?: '-'}/${j.min ?: '-'}°")))
+
+;; Contenu de la maquette validee (14/09) : centre = icone + temperature +
+;; condition ; a droite, les 3 jours ; en haut a gauche, vent et humidite ;
+;; en bas a gauche, lever et coucher du soleil.
+;; Classes "meteo-*" : JAMAIS "hud-meteo", le nom de la fenetre (voir R2).
+(defwidget hud_meteo []
+  (overlay
+    (box)
+    (hud_case :nom "meteo-centre" :x 43 :y 72 :w 80 :h 92
+      (box :orientation "h" :space-evenly false :halign "center" :spacing 4
+        (image :path "${EWW_CONFIG_DIR}/hud/icones/${hud_meteo.icone ?: 'nuage'}.svg"
+               :image-width 20 :image-height 20)
+        (label :class "meteo-temp" :text "${hud_meteo.temp ?: '-'}°"))
+      (label :class "meteo-cond" :justify "center" :text {hud_meteo.condition ?: ''}))
+    (hud_case :nom "meteo-haut-droit" :x 83 :y 3 :w 80 :h 92
+      (meteo_jour :j {hud_meteo.jours[0] ?: '{}'}))
+    (hud_case :nom "meteo-droit" :x 123 :y 72 :w 80 :h 92
+      (meteo_jour :j {hud_meteo.jours[1] ?: '{}'}))
+    (hud_case :nom "meteo-bas-droit" :x 83 :y 141 :w 80 :h 92
+      (meteo_jour :j {hud_meteo.jours[2] ?: '{}'}))
+    (hud_case :nom "meteo-haut-gauche" :x 3 :y 3 :w 80 :h 92
+      (label :class "meteo-detail" :text {hud_meteo.vent ?: ''})
+      (label :class "meteo-detail-2" :text {hud_meteo.humidite ?: ''}))
+    (hud_case :nom "meteo-bas-gauche" :x 3 :y 141 :w 80 :h 92
+      (label :class "meteo-detail" :text "↑${hud_meteo.lever ?: ''}")
+      (label :class "meteo-detail-2" :text "↓${hud_meteo.coucher ?: ''}"))))
+
 (defwindow hud-meteo
   :monitor 0
   :geometry (geometry :x "9px" :y "187px" :width "206px" :height "236px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (hud_piece :nom "meteo" :w 206 :h 236))
+  (hud_piece :nom "meteo" :w 206 :h 236
+    (hud_meteo)))
 
 (defwindow hud-sparklines
   :monitor 0

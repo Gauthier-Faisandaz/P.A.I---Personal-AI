@@ -1,0 +1,12 @@
+{
+  "synchro": "10:29",
+  "temp": 18, "ressenti": 17, "lieu": "Hantay",
+  "icone": "soleil", "condition": "Peu nuageux",
+  "vent": "12 km/h", "humidite": "58 %",
+  "lever": "07:15", "coucher": "20:20",
+  "jours": [
+    { "jour": "mar.", "icone": "nuage",  "max": 23, "min": 15 },
+    { "jour": "mer.", "icone": "pluie",  "max": 19, "min": 13 },
+    { "jour": "jeu.", "icone": "soleil", "max": 22, "min": 12 }
+  ]
+}

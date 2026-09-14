@@ -355,3 +355,32 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   font-size: 18px;
   color: rgba(255, 255, 255, 0.75);
 }
+
+/* --- Panneau d'angle : meteo (nid d'abeille) --------------------------- */
+/* Meme police et memes blancs que la colonne (texte white / .75). Tailles
+   choisies pour tenir dans un hexagone de 80 x 92 px (cellule de rayon 46,
+   cadre.py) : la condition est coupee en lignes de 11 caracteres au plus par
+   fetch-meteo.sh. Noms de classe "meteo-*" et jamais "hud-meteo" : c'est le
+   nom de la fenetre, et une regle a son nom s'appliquerait a toute la
+   fenetre (voir .hud-heure-bloc). */
+.meteo-temp {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 22px;
+  font-weight: bold;
+  color: white;
+}
+.meteo-cond,
+.meteo-jour,
+.meteo-detail-2 {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.meteo-jour-temp,
+.meteo-detail {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+}
+.meteo-detail { font-weight: normal; }
