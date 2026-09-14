@@ -10,9 +10,9 @@ et "python3 cadre.py verifier" controle que tout concorde.
 Disposition (croquis de Gauthier du 14/09, 60 % de la hauteur de l'ecran),
 tout empile verticalement, hexagones reguliers "pointe en haut" :
   - heure      : un grand hexagone, rogne par le haut et la gauche de l'ecran ;
-  - meteo      : un nid d'abeille de 7 hexagones egaux (centre + 6 voisins),
-                 rogne a gauche ; la cellule de gauche est une piece a part
-                 (son propre contour), les 6 autres ne font qu'une forme ;
+  - meteo      : un nid d'abeille de 6 hexagones egaux (centre, haut-gauche,
+                 haut-droit, droit, bas-droit, bas-gauche), qui ne forment
+                 qu'une seule piece ; ceux de gauche sont rognes par l'ecran ;
   - sparklines : 3 hexagones empiles.
 Aucune decoration pour l'instant (demande du 14/09) : verre + contour.
 
@@ -30,6 +30,18 @@ horizontal, sinon des morceaux du verre restent nets. D'ou :
     Surtout pas x < 0 : a gauche de l'ecran HDMI se trouve l'ecran du
     portable (il commence en y = 321), la fenetre y deborderait.
 "python3 cadre.py verifier" controle cette symetrie.
+
+BORDS LISSES : la forme X Shape est binaire (un pixel est dedans ou dehors),
+un bord oblique y devient donc un escalier. Si elle coupe le trait du
+contour, le trait devient un escalier lui aussi (constate le 14/09). D'ou :
+  - la forme X Shape est un peu PLUS GRANDE que l'hexagone dessine (rayon
+    R + DILATATION, soit ~1,7 px de plus de chaque cote) ;
+  - le contour est dessine en entier, lisse (librsvg l'adoucit), a
+    l'interieur de cette forme : l'escalier tombe a l'exterieur du trait,
+    dans le vide, ou il ne se voit presque plus ;
+  - chaque fenetre a une MARGE de vide autour de ses hexagones pour contenir
+    tout ca -- sauf au bord gauche de l'ecran, ou l'on coupe net (une coupe
+    verticale ne fait pas d'escalier, et x < 0 est interdit, voir plus haut).
 
 Couleurs (tokens de eww.scss) :
     verre    rgba(255,255,255,.10)   = .panel background-color
@@ -55,9 +67,9 @@ import sys
 
 VERRE   = 'rgba(255,255,255,.10)'
 CONTOUR = 'rgba(255,255,255,.55)'
-# Epaisseur du trait de contour. Seule sa moitie INTERIEURE est visible : la
-# decoupe X Shape de la fenetre coupe tout ce qui depasse de la forme.
-TRAIT = 2.4
+TRAIT = 1.4          # epaisseur du contour (px), trait entier et lisse
+MARGE = 3            # vide autour des hexagones dans leur fenetre (px)
+DILATATION = 2       # forme X Shape = hexagones de rayon R + 2 (~1,7 px de plus)
 
 S3 = math.sqrt(3) / 2
 
@@ -73,61 +85,66 @@ def hexa(cx, cy, R):
 
 # ---------------------------------------------------------------- geometrie
 # Chaque piece = une fenetre eww, nommee "hud-<piece>".
-#   fenetre  : (x, y, largeur, hauteur) en px, repere de l'ecran du dashboard
-#              (1920 x 1080). y < 0 = la fenetre commence au-dessus de l'ecran.
-#   cellules : (cx, cy, R, groupe), dans le repere de la FENETRE.
-#              groupe "forme"  : fusionnee avec les autres cellules "forme"
-#                                (pas de trait entre elles) ;
-#              groupe "a_part" : cellule a son propre contour complet.
-# Axe commun : toutes les pieces sont centrees sur x = 52 (ecran).
-# Ecarts : ~10 px entre les pieces, 9 px entre deux sparklines.
+# cellules : (cx, cy, R) = centre et rayon de chaque hexagone, en px, dans le
+# repere de l'ECRAN du dashboard (1920 x 1080 ; y < 0 = au-dessus de l'ecran).
+# La fenetre de chaque piece en est deduite (fenetre_de) : rien a recopier.
+# Axe commun : toutes les pieces sont centrees sur x = 52.
 
 # Meteo : cellules de rayon 38 (66 x 76 px). Dans un nid d'abeille "pointe en
 # haut", les voisins sont a (+-2a, 0) et (+-a, +-3b) du centre.
 RM = 38
 AM, BM = round(S3 * RM), RM // 2     # 33, 19
-MX, MY = 52, 95                      # centre du nid, repere de la fenetre
+MX, MY = 52, 249                     # centre du nid
 
 PIECES = {
-    # Heure : rayon 88 (152 x 176 px), centre ecran (52, 56) : 32 px au-dessus
-    # de l'ecran (y negatif), 24 px a gauche (coupe verticale par la fenetre).
-    'heure': {
-        'fenetre':  (0, -32, 128, 176),
-        'cellules': [(52, 88, 88, 'forme')],
-    },
-    'meteo': {
-        'fenetre':  (0, 154, 151, 190),
-        'cellules': [(MX,          MY,          RM, 'forme'),    # centre
-                     (MX + AM,     MY - 3 * BM, RM, 'forme'),    # haut-droit
-                     (MX + 2 * AM, MY,          RM, 'forme'),    # droit
-                     (MX + AM,     MY + 3 * BM, RM, 'forme'),    # bas-droit
-                     (MX - AM,     MY + 3 * BM, RM, 'forme'),    # bas-gauche (a moitie rogne)
-                     (MX - AM,     MY - 3 * BM, RM, 'forme'),    # haut-gauche (a moitie rogne)
-                     (MX - 2 * AM, MY,          RM, 'a_part')],  # gauche (presque hors ecran)
-    },
+    # Heure : rayon 88 (152 x 176 px), centre (52, 56) : l'hexagone depasse
+    # de 32 px au-dessus de l'ecran et de 24 px a gauche.
+    'heure': {'cellules': [(52, 56, 88)]},
+    'meteo': {'cellules': [(MX,          MY,          RM),     # centre
+                           (MX + AM,     MY - 3 * BM, RM),     # haut-droit
+                           (MX + 2 * AM, MY,          RM),     # droit
+                           (MX + AM,     MY + 3 * BM, RM),     # bas-droit
+                           (MX - AM,     MY + 3 * BM, RM),     # bas-gauche (a moitie rogne)
+                           (MX - AM,     MY - 3 * BM, RM)]},   # haut-gauche (a moitie rogne)
     # Sparklines : rayon 46 (80 x 92 px), empilees, 9 px entre deux.
-    'sparklines': {
-        'fenetre':  (12, 355, 80, 294),
-        'cellules': [(40, 46, 46, 'forme'), (40, 147, 46, 'forme'), (40, 248, 46, 'forme')],
-    },
+    'sparklines': {'cellules': [(52, 401, 46), (52, 502, 46), (52, 603, 46)]},
 }
+
+def fenetre_de(cellules):
+    """Rectangle (x, y, largeur, hauteur) de la fenetre : les hexagones plus
+    MARGE de chaque cote, sauf a gauche de l'ecran (x jamais < 0)."""
+    gauche = min(cx - round(S3 * R) for cx, cy, R in cellules)
+    droite = max(cx + round(S3 * R) for cx, cy, R in cellules)
+    haut   = min(cy - R for cx, cy, R in cellules)
+    bas    = max(cy + R for cx, cy, R in cellules)
+    x0, y0 = max(0, gauche - MARGE), haut - MARGE
+    return (x0, y0, droite + MARGE - x0, bas + MARGE - y0)
+
+for _p in PIECES.values():
+    _p['fenetre'] = fenetre_de(_p['cellules'])
 
 def fenetre_eww(piece):
     """Nom de la fenetre eww (defwindow) de la piece ; son titre X est
     "Eww - " + ce nom (verifie avec xprop)."""
     return 'hud-' + piece
 
+def cellules_locales(piece):
+    """Les cellules dans le repere de leur FENETRE."""
+    x0, y0 = PIECES[piece]['fenetre'][:2]
+    return [(cx - x0, cy - y0, R) for cx, cy, R in PIECES[piece]['cellules']]
+
 def decoupe(piece):
-    """Polygones de la forme X Shape de la fenetre (un par cellule, repere de
-    la fenetre). Leur union est la seule zone affichee, et floutee, par picom."""
-    return [hexa(cx, cy, R) for cx, cy, R, _ in PIECES[piece]['cellules']]
+    """Polygones de la forme X Shape de la fenetre (repere de la fenetre) :
+    les hexagones agrandis de DILATATION (voir BORDS LISSES en tete). Leur
+    union est la seule zone affichee, et floutee, par picom."""
+    return [hexa(cx, cy, R + DILATATION) for cx, cy, R in cellules_locales(piece)]
 
 def symetrique(piece):
     """La regle de picom (voir en tete) : chaque cellule a-t-elle sa jumelle
     symetrique haut/bas dans la fenetre ? (Un hexagone "pointe en haut" est
     lui-meme symetrique : il suffit de comparer les centres.)"""
     h = PIECES[piece]['fenetre'][3]
-    cellules = {(cx, cy, R) for cx, cy, R, _ in PIECES[piece]['cellules']}
+    cellules = set(cellules_locales(piece))
     return cellules == {(cx, h - cy, R) for cx, cy, R in cellules}
 
 # ---------------------------------------------------------------- SVG
@@ -136,34 +153,26 @@ def chemin(polygones):
     return ' '.join('M' + ' L'.join(f'{x},{y}' for x, y in p) + ' Z' for p in polygones)
 
 def aretes_contour(piece):
-    """Aretes a tracer : le bord exterieur des cellules "forme" (une arete
-    partagee par deux cellules voisines est interieure : on l'ecarte), plus
-    toutes les aretes des cellules "a_part"."""
-    compte, a_part = {}, []
-    for cx, cy, R, groupe in PIECES[piece]['cellules']:
+    """Bord exterieur de la piece : les aretes des hexagones, sauf celles que
+    partagent deux cellules voisines (interieures : pas de trait entre elles)."""
+    compte = {}
+    for cx, cy, R in cellules_locales(piece):
         p = hexa(cx, cy, R)
-        aretes = [(p[i], p[(i + 1) % 6]) for i in range(6)]
-        if groupe == 'a_part':
-            a_part += aretes
-        else:
-            for a, b in aretes:
-                cle = frozenset((a, b))
-                compte[cle] = compte.get(cle, 0) + 1
-    bord = [tuple(sorted(cle)) for cle, n in compte.items() if n == 1]
-    return bord + a_part
+        for i in range(6):
+            cle = frozenset((p[i], p[(i + 1) % 6]))
+            compte[cle] = compte.get(cle, 0) + 1
+    return [tuple(sorted(cle)) for cle, n in compte.items() if n == 1]
 
 def svg_piece(piece):
-    """Cadre d'une piece, a la taille de sa fenetre : verre sur l'union des
-    cellules, puis le contour, limite a l'interieur de la forme (clip-path)
-    pour correspondre a ce que la decoupe X Shape laissera voir."""
+    """Cadre d'une piece, a la taille de sa fenetre : verre sur les hexagones
+    (taille reelle, pas agrandie), puis le contour, trait entier et lisse."""
     _, _, W, H = PIECES[piece]['fenetre']
-    forme = chemin(decoupe(piece))
+    cellules = [hexa(cx, cy, R) for cx, cy, R in cellules_locales(piece)]
     traits = ' '.join(f'M{a[0]},{a[1]} L{b[0]},{b[1]}' for a, b in aretes_contour(piece))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
-            f'<defs><clipPath id="forme"><path d="{forme}"/></clipPath></defs>'
-            f'<path d="{forme}" fill="{VERRE}"/>'
+            f'<path d="{chemin(cellules)}" fill="{VERRE}"/>'
             f'<path d="{traits}" fill="none" stroke="{CONTOUR}" stroke-width="{TRAIT}" '
-            f'stroke-linecap="round" clip-path="url(#forme)"/>'
+            f'stroke-linecap="round" stroke-linejoin="round"/>'
             f'</svg>\n')
 
 # ---------------------------------------------------------------- eww.yuck
