@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
 decoupe-hud.py - donne a chaque fenetre du panneau d'angle (hud-heure,
-hud-meteo, hud-sparklines) la forme exacte de ses hexagones (extension X
-Shape), pour que picom ne floute QUE les hexagones, et pas le rectangle de
-la fenetre autour.
+hud-meteo, hud-sparklines) sa forme exacte (extension X Shape), pour que
+picom ne floute QUE ses hexagones, et pas le rectangle de la fenetre autour.
 
 Pourquoi un script externe : eww 0.6.0 ne sait pas donner une forme a une
 fenetre (spike du 11/09). On la pose donc de l'exterieur, sur les fenetres X
@@ -13,15 +12,17 @@ La forme vit sur la fenetre X, pas dans eww : eww reload, un close/open, un
 enregistrement de eww.yuck ou un redemarrage du demon recreent les fenetres,
 SANS forme. D'ou deux appels :
   - ouvrir-hud.sh, juste apres l'ouverture (option --attendre) ;
-  - eww-watchdog.sh, quand les identifiants X des fenetres ont change.
+  - eww-watchdog.sh, quand la liste des fenetres a change.
 
 Ne touche pas une fenetre qui a DEJA une forme : la reposer enverrait un
 evenement ShapeNotify, et picom recalculerait et repeindrait le flou pour
-rien.
+rien. (Apres un changement de masque, rouvrir le HUD : ouvrir-hud.sh.)
 
-Geometrie : cadre.py (source unique), PIECES et decoupe(). Chaque forme doit
-etre symetrique haut/bas dans sa fenetre, a cause d'un bogue de picom 10.2
-(voir cadre.py) ; "python3 cadre.py verifier" le controle.
+Forme : les masques hud/<piece>.masque, tires du rendu des cadres SVG par
+generer-cadres.sh (voir cadre.py, DECOUPE AU PIXEL PRES). Ce script ne fait
+que les lire : pas de GTK a charger, il reste rapide. Chaque masque doit etre
+symetrique haut/bas, a cause d'un bogue de picom 10.2 (voir cadre.py) ;
+"python3 cadre.py verifier" le controle.
 Zero dependance Python : ctypes sur libX11 et libXext, deja installees.
 
 Usage :
@@ -33,7 +34,8 @@ Code de sortie :
     0  toutes les fenetres hud-* presentes ont leur forme
     1  serveur X injoignable
     2  aucune fenetre hud-* (HUD ferme : rien a faire)
-    3  une forme manque apres la pose (fenetre disparue entre-temps ?)
+    3  une forme manque apres la pose (fenetre disparue entre-temps, ou
+       masque illisible / pas a la taille de la fenetre)
 """
 import ctypes
 import os
@@ -48,7 +50,7 @@ import cadre
 TITRES = {f'Eww - {cadre.fenetre_eww(p)}'.encode(): p for p in cadre.PIECES}
 
 # Constantes de X11 / de l'extension Shape (X11/extensions/shape.h)
-SHAPE_BOUNDING, SHAPE_INPUT, SHAPE_SET, EVEN_ODD = 0, 2, 0, 0
+SHAPE_BOUNDING, SHAPE_INPUT, SHAPE_SET = 0, 2, 0
 
 # Noms exacts des bibliotheques, et PAS ctypes.util.find_library : celle-ci
 # lance un sous-processus (ldconfig) a chaque appel, et coutait a elle seule
@@ -56,8 +58,9 @@ SHAPE_BOUNDING, SHAPE_INPUT, SHAPE_SET, EVEN_ODD = 0, 2, 0, 0
 x11  = ctypes.CDLL('libX11.so.6')
 xext = ctypes.CDLL('libXext.so.6')
 
-class XPoint(ctypes.Structure):
-    _fields_ = [('x', ctypes.c_short), ('y', ctypes.c_short)]
+class XRectangle(ctypes.Structure):
+    _fields_ = [('x', ctypes.c_short), ('y', ctypes.c_short),
+                ('width', ctypes.c_ushort), ('height', ctypes.c_ushort)]
 
 Display, Window, Region = ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p
 PWindow = ctypes.POINTER(Window)
@@ -73,9 +76,7 @@ x11.XFetchName.argtypes = [Display, Window, ctypes.POINTER(ctypes.c_void_p)]
 x11.XFree.argtypes = [ctypes.c_void_p]
 x11.XSync.argtypes = [Display, ctypes.c_int]
 x11.XCreateRegion.restype = Region
-x11.XPolygonRegion.restype = Region
-x11.XPolygonRegion.argtypes = [ctypes.POINTER(XPoint), ctypes.c_int, ctypes.c_int]
-x11.XUnionRegion.argtypes = [Region, Region, Region]
+x11.XUnionRectWithRegion.argtypes = [ctypes.POINTER(XRectangle), Region, Region]
 x11.XDestroyRegion.argtypes = [Region]
 xext.XShapeCombineRegion.argtypes = [Display, Window, ctypes.c_int, ctypes.c_int,
                                      ctypes.c_int, Region, ctypes.c_int]
@@ -128,18 +129,24 @@ def a_une_forme(dpy, w):
 
 
 def poser(dpy, w, piece):
-    """Forme = union des hexagones de cadre.decoupe(piece). Posee aussi en
-    forme d'ENTREE : un clic hors des hexagones traverse jusqu'au bureau."""
+    """Forme = union des rectangles du masque hud/<piece>.masque. Posee aussi
+    en forme d'ENTREE : un clic hors du dessin traverse jusqu'au bureau.
+    Renvoie False si le masque est illisible (fichier absent ou abime)."""
+    try:
+        _, _, rectangles = cadre.lire_masque(piece)
+    except (OSError, ValueError, IndexError) as e:
+        print(f'decoupe-hud : masque de {piece} illisible ({e})', file=sys.stderr)
+        return False
     region = x11.XCreateRegion()
-    for pts in cadre.decoupe(piece):
-        tableau = (XPoint * len(pts))(*[XPoint(x, y) for x, y in pts])
-        morceau = x11.XPolygonRegion(tableau, len(pts), EVEN_ODD)
-        x11.XUnionRegion(region, morceau, region)
-        x11.XDestroyRegion(morceau)
+    r = XRectangle()
+    for x, y, l, h in rectangles:
+        r.x, r.y, r.width, r.height = x, y, l, h
+        x11.XUnionRectWithRegion(ctypes.byref(r), region, region)
     for sorte in (SHAPE_BOUNDING, SHAPE_INPUT):
         xext.XShapeCombineRegion(dpy, w, sorte, 0, 0, region, SHAPE_SET)
     x11.XDestroyRegion(region)
     x11.XSync(dpy, 0)
+    return True
 
 
 def main():
@@ -172,8 +179,7 @@ def main():
             if etat:
                 manque = True
                 continue
-            poser(dpy, w, piece)
-            if a_une_forme(dpy, w):
+            if poser(dpy, w, piece) and a_une_forme(dpy, w):
                 print(f'decoupe posee sur {cadre.fenetre_eww(piece)} ({hex(w)})')
             else:
                 manque = True

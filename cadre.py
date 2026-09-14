@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 cadre.py - geometrie du panneau d'angle (HUD) : une colonne d'hexagones le
-long du bord gauche de l'ecran, et les cadres SVG qui la dessinent.
+long du bord gauche de l'ecran, les cadres SVG qui la dessinent, et les
+masques de decoupe tires de ces cadres.
 
 Source UNIQUE de la geometrie : eww.yuck en recopie les nombres (section
-PANNEAU D'ANGLE), decoupe-hud.py en tire la forme X Shape de chaque fenetre,
+PANNEAU D'ANGLE), decoupe-hud.py applique les masques (hud/<piece>.masque),
 et "python3 cadre.py verifier" controle que tout concorde.
 
 Disposition (croquis de Gauthier du 14/09 ; ~73 % de la hauteur de l'ecran
@@ -40,17 +41,23 @@ de l'hexagone : son cote gauche a x < 0, et son arete haut-gauche au-dessus
 du coin. "python3 cadre.py verifier" controle que le coin est dedans, a au
 moins COIN_MARGE px de chaque arete.
 
-BORDS LISSES : la forme X Shape est binaire (un pixel est dedans ou dehors),
-un bord oblique y devient donc un escalier. Si elle coupe le trait du
-contour, le trait devient un escalier lui aussi (constate le 14/09). D'ou :
-  - la forme X Shape est un peu PLUS GRANDE que l'hexagone dessine (rayon
-    R + DILATATION, soit ~1,7 px de plus de chaque cote) ;
-  - le contour est dessine en entier, lisse (librsvg l'adoucit), a
-    l'interieur de cette forme : l'escalier tombe a l'exterieur du trait,
-    dans le vide, ou il ne se voit presque plus ;
-  - chaque fenetre a une MARGE de vide autour de ses hexagones pour contenir
-    tout ca -- sauf au bord gauche de l'ecran, ou l'on coupe net (une coupe
-    verticale ne fait pas d'escalier, et x < 0 est interdit, voir plus haut).
+DECOUPE AU PIXEL PRES (14/09) : la forme X Shape est binaire (un pixel est
+dedans ou dehors). Deux essais avant d'en arriver la :
+  - forme = hexagone exact : elle coupait le trait du contour, qui devenait
+    un escalier ;
+  - forme = hexagone agrandi de ~1,7 px : le trait restait lisse, mais le
+    flou debordait dans cette bande, sans le voile du verre (un liseré de 0
+    a 2 px selon l'endroit, remarque par Gauthier).
+Desormais la forme est tiree du DESSIN : le cadre SVG est rendu par
+GdkPixbuf (le meme moteur que GTK), et la forme est exactement l'ensemble
+des pixels ou il dessine quelque chose (verre ou trait, pixels adoucis
+compris, opacite > SEUIL_ALPHA). Le flou s'arrete au bord exterieur du
+trait, et le trait reste lisse. La symetrie haut/bas est imposee (union du
+masque et de son reflet).
+Ces masques sont calcules par generer-cadres.sh (hud/<piece>.masque) :
+decoupe-hud.py ne fait que les lire, sans charger GTK.
+Chaque fenetre garde une MARGE de vide autour de ses hexagones -- sauf au
+bord gauche de l'ecran, ou l'on coupe net (x < 0 est interdit, voir plus haut).
 
 MEME TRAIT QUE LA COLONNE (demande du 14/09) : la bordure des panneaux de
 la colonne fait 1 px, a .25 d'opacite, et tombe sur une colonne de pixels
@@ -70,13 +77,12 @@ ATTENTION : ce fichier genere du SVG consomme par librsvg. Rester en ASCII
 dans les chaines produites (les commentaires Python n'y vont pas).
 
 Usage :
-    python3 cadre.py heure        > hud/heure.svg
-    python3 cadre.py meteo        > hud/meteo.svg
-    python3 cadre.py sparklines   > hud/sparklines.svg
-    python3 cadre.py decoupe                   # polygones X Shape (repere de chaque fenetre)
+    python3 cadre.py heure        > hud/heure.svg        (idem meteo, sparklines)
+    python3 cadre.py masque heure > hud/heure.masque     (rendu du SVG : GTK requis)
+    python3 cadre.py decoupe                   # resume des masques enregistres
     python3 cadre.py geometrie                 # les lignes a recopier dans eww.yuck
-    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? symetrie ? coin cache ?
-(generer-cadres.sh fait les SVG et la verification d'un coup.)
+    python3 cadre.py verifier [eww.yuck]       # eww.yuck a jour ? symetrie ? coin ? masques ?
+(generer-cadres.sh fait les SVG, les masques et la verification d'un coup.)
 """
 import math
 import os
@@ -88,9 +94,11 @@ CONTOUR = 'rgba(255,255,255,.25)'
 TRAIT = 1            # epaisseur du contour (px), comme .panel border ($bordure)
 RETRAIT = 0.5        # le contour est trace a 0,5 px a l'interieur (voir MEME TRAIT)
 MARGE = 3            # vide autour des hexagones dans leur fenetre (px)
-DILATATION = 2       # forme X Shape = hexagones de rayon R + 2 (~1,7 px de plus)
+SEUIL_ALPHA = 3      # un pixel est dans la forme si son opacite depasse 3/255
+                     # (ecarte la "poussiere" numerique du lissage)
 COIN_MARGE = 6       # le coin de l'ecran doit etre a >= 6 px des aretes de l'heure
 
+ICI = os.path.dirname(os.path.abspath(__file__))
 S3 = math.sqrt(3) / 2
 
 def hexa(cx, cy, R):
@@ -214,12 +222,6 @@ def cellules_locales(piece):
     x0, y0 = PIECES[piece]['fenetre'][:2]
     return [(cx - x0, cy - y0, R) for cx, cy, R in PIECES[piece]['cellules']]
 
-def decoupe(piece):
-    """Polygones de la forme X Shape de la fenetre (repere de la fenetre) :
-    les hexagones agrandis de DILATATION (voir BORDS LISSES en tete). Leur
-    union est la seule zone affichee, et floutee, par picom."""
-    return [hexa(cx, cy, R + DILATATION) for cx, cy, R in cellules_locales(piece)]
-
 def symetrique(piece):
     """La regle de picom (voir en tete) : chaque cellule a-t-elle sa jumelle
     symetrique haut/bas dans la fenetre ? (Un hexagone "pointe en haut" est
@@ -257,8 +259,8 @@ def segments_contour(piece):
     return segments
 
 def svg_piece(piece):
-    """Cadre d'une piece, a la taille de sa fenetre : verre sur les hexagones
-    (taille reelle, pas agrandie), puis le contour, trait entier et lisse."""
+    """Cadre d'une piece, a la taille de sa fenetre : verre sur les hexagones,
+    puis le contour, trait entier et lisse."""
     _, _, W, H = PIECES[piece]['fenetre']
     cellules = [hexa(cx, cy, R) for cx, cy, R in cellules_locales(piece)]
     traits = ' '.join(f'M{a[0]:.2f},{a[1]:.2f} L{b[0]:.2f},{b[1]:.2f}' for a, b in segments_contour(piece))
@@ -267,6 +269,57 @@ def svg_piece(piece):
             f'<path d="{traits}" fill="none" stroke="{CONTOUR}" stroke-width="{TRAIT}" '
             f'stroke-linecap="square"/>'
             f'</svg>\n')
+
+# ---------------------------------------------------------------- masques
+
+def calculer_masque(piece):
+    """Pixels de la fenetre ou le cadre dessine quelque chose (opacite >
+    SEUIL_ALPHA), d'apres son rendu par GdkPixbuf -- le moteur de GTK, donc
+    exactement ce que eww affichera. Symetrie haut/bas imposee (union avec le
+    reflet), pour la regle de picom. Renvoie (largeur, hauteur, lignes de bool).
+    GTK n'est charge qu'ici : decoupe-hud.py, qui ne fait que lire les
+    masques, reste rapide."""
+    import gi
+    gi.require_version('GdkPixbuf', '2.0')
+    from gi.repository import GdkPixbuf
+    chargeur = GdkPixbuf.PixbufLoader.new_with_type('svg')
+    chargeur.write(svg_piece(piece).encode('ascii'))
+    chargeur.close()
+    pb = chargeur.get_pixbuf()
+    W, H = pb.get_width(), pb.get_height()
+    n, pas, px = pb.get_n_channels(), pb.get_rowstride(), pb.get_pixels()
+    m = [[px[y * pas + x * n + 3] > SEUIL_ALPHA for x in range(W)] for y in range(H)]
+    return W, H, [[m[y][x] or m[H - 1 - y][x] for x in range(W)] for y in range(H)]
+
+def texte_masque(piece):
+    """Le fichier hud/<piece>.masque : une ligne "largeur hauteur", puis un
+    rectangle "x y largeur 1" par suite de pixels de la forme sur une ligne."""
+    W, H, m = calculer_masque(piece)
+    lignes = [f'# masque X Shape de {fenetre_eww(piece)} (genere par cadre.py : ne pas modifier)',
+              f'{W} {H}']
+    for y, rang in enumerate(m):
+        x = 0
+        while x < W:
+            if rang[x]:
+                debut = x
+                while x < W and rang[x]:
+                    x += 1
+                lignes.append(f'{debut} {y} {x - debut} 1')
+            else:
+                x += 1
+    return '\n'.join(lignes) + '\n'
+
+def lire_masque(piece):
+    """Lit hud/<piece>.masque : renvoie (largeur, hauteur, [(x, y, l, h), ...])."""
+    with open(os.path.join(ICI, 'hud', f'{piece}.masque')) as f:
+        lignes = [l.split() for l in f if l.strip() and not l.startswith('#')]
+    W, H = (int(v) for v in lignes[0])
+    return W, H, [tuple(int(v) for v in l) for l in lignes[1:]]
+
+def masque_symetrique(H, rectangles):
+    """Le masque est-il son propre reflet haut/bas (ligne y <-> ligne H-1-y) ?"""
+    lignes = {(x, y, l) for x, y, l, _ in rectangles}
+    return lignes == {(x, H - 1 - y, l) for x, y, l in lignes}
 
 # ---------------------------------------------------------------- eww.yuck
 
@@ -281,8 +334,8 @@ def afficher_geometrie():
 
 def verifier(chemin_yuck):
     """Compare les nombres recopies dans eww.yuck a ceux de ce fichier, et
-    controle la symetrie de chaque fenetre et le coin cache par l'heure.
-    Renvoie le code de sortie (0 ou 1)."""
+    controle la symetrie de chaque fenetre, le coin cache par l'heure et les
+    masques enregistres. Renvoie le code de sortie (0 ou 1)."""
     with open(chemin_yuck, encoding='utf-8') as f:
         # On ignore les lignes de commentaire (;;) : elles peuvent citer des
         # exemples qui ne sont pas le vrai code.
@@ -302,8 +355,21 @@ def verifier(chemin_yuck):
         erreurs = 1
     for piece, p in PIECES.items():
         fen = fenetre_eww(piece)
+        attendu = p['fenetre']
         if not symetrique(piece):
             print(f'ECART         {fen} : forme NON symetrique haut/bas (bogue picom : verre net)')
+            erreurs = 1
+        # Masque enregistre : present, a la taille de la fenetre, symetrique.
+        try:
+            W, H, rects = lire_masque(piece)
+            if (W, H) == attendu[2:] and masque_symetrique(H, rects):
+                print(f'ok            hud/{piece}.masque : {W}x{H}, {len(rects)} rectangles, symetrique')
+            else:
+                print(f'ECART         hud/{piece}.masque : {W}x{H} (attendu {attendu[2]}x{attendu[3]}), '
+                      f'symetrique {masque_symetrique(H, rects)} -- relancer generer-cadres.sh')
+                erreurs = 1
+        except (OSError, ValueError, IndexError) as e:
+            print(f'ECART         hud/{piece}.masque illisible ({e}) -- relancer generer-cadres.sh')
             erreurs = 1
         debut = re.search(r'\(defwindow\s+' + re.escape(fen) + r'(?=[\s\[])', texte)
         if not debut:
@@ -319,7 +385,6 @@ def verifier(chemin_yuck):
         # (pas de ")" exige apres :h : la piece peut contenir un enfant, son contenu)
         m = re.search(r'\(hud_piece\s+:nom\s+"([\w-]+)"\s+:w\s+(\d+)\s+:h\s+(\d+)\b', corps)
         piece_lue = (m.group(1), int(m.group(2)), int(m.group(3))) if m else None
-        attendu = p['fenetre']
         if lu == attendu and piece_lue == (piece, attendu[2], attendu[3]):
             print(f'ok            {fen} : {attendu[0]},{attendu[1]} {attendu[2]}x{attendu[3]}, symetrique')
         else:
@@ -332,14 +397,16 @@ if __name__ == '__main__':
     quoi = sys.argv[1] if len(sys.argv) > 1 else 'geometrie'
     if quoi in PIECES:
         sys.stdout.write(svg_piece(quoi))
+    elif quoi == 'masque' and len(sys.argv) > 2 and sys.argv[2] in PIECES:
+        sys.stdout.write(texte_masque(sys.argv[2]))
     elif quoi == 'decoupe':
         for piece in PIECES:
-            for p in decoupe(piece):
-                print(f'{piece:<11} ' + ' '.join(f'{x},{y}' for x, y in p))
+            W, H, rects = lire_masque(piece)
+            print(f'{piece:<11} {W}x{H} : {len(rects)} rectangles, '
+                  f'{sum(l * h for _, _, l, h in rects)} px, symetrique {masque_symetrique(H, rects)}')
     elif quoi == 'geometrie':
         afficher_geometrie()
     elif quoi == 'verifier':
-        defaut = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'eww.yuck')
-        sys.exit(verifier(sys.argv[2] if len(sys.argv) > 2 else defaut))
+        sys.exit(verifier(sys.argv[2] if len(sys.argv) > 2 else os.path.join(ICI, 'eww.yuck')))
     else:
-        sys.exit(f'usage : cadre.py {"|".join(PIECES)}|decoupe|geometrie|verifier')
+        sys.exit(f'usage : cadre.py {"|".join(PIECES)} | masque <piece> | decoupe | geometrie | verifier')
