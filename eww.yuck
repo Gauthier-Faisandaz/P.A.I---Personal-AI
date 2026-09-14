@@ -478,14 +478,15 @@
 ;;  - horloge : 10 s suffisent, l'heure n'affiche que les minutes.
 ;;  - vrac    : taches Taskwarrior sans date (voir fetch-vrac.sh). 1 min.
 ;;  - sys     : CPU / RAM / reseau en % (voir fetch-sys.sh, et pourquoi pas
-;;              les variables magiques EWW_CPU & co). 5 s.
+;;              les variables magiques EWW_CPU & co). 2 s depuis le 14/09
+;;              (5 s avant) : les sparklines du HUD lisent la meme variable.
 (defpoll horloge :interval "10s" :initial ""
   "LC_TIME=fr_FR.UTF-8 date '+%a %-d %b · %H:%M'")
 
 (defpoll vrac :interval "1m" :initial "{\"texte\":\"\"}"
   "bash ~/.config/eww/fetch-vrac.sh")
 
-(defpoll sys :interval "5s" :initial "{\"cpu\":0,\"ram\":0,\"net\":0}"
+(defpoll sys :interval "2s" :initial "{\"cpu\":0,\"ram\":0,\"net\":0}"
   "bash ~/.config/eww/fetch-sys.sh")
 
 ;; --- Jauge : nom + barre (widget progress, valeur 0-100) -------------------
@@ -731,11 +732,11 @@
     (hud_meteo)))
 
 ;; --- Sparklines (3 hexagones : CPU, RAM, NET) -----------------------------
-;; Donnees : la variable "sys" du BANDEAU (fetch-sys.sh, toutes les 5 s). Pas
+;; Donnees : la variable "sys" du BANDEAU (fetch-sys.sh, toutes les 2 s). Pas
 ;; de second collecteur : fetch-sys.sh calcule CPU et reseau par DIFFERENCE
 ;; avec l'appel precedent, deux appelants fausseraient les deux affichages.
 ;; Depuis R4, sys porte aussi l'historique : sys.hist.cpu = [{"h": 0-100,
-;; "d": derniere ?}, ...], les 20 dernieres mesures, deja normalisees sur
+;; "d": derniere ?}, ...], les 18 dernieres mesures, deja normalisees sur
 ;; leur propre fenetre (voir fetch-sys.sh).
 ;; Une barre par mesure : un widget, pas une image (brief, section 5 : rien a
 ;; ecrire sur disque, rien a recharger). Hauteur : h (0-100) * 0,22 + 1 px.

@@ -387,7 +387,7 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
 
 /* --- Panneau d'angle : sparklines (CPU, RAM, NET) ---------------------- */
 /* Une barre par mesure (widget, pas une image) : 3 px de large, 1 px
-   d'ecart, 20 barres = 79 px dans un hexagone de 96 px (cellule de rayon
+   d'ecart, 18 barres = 71 px dans un hexagone de 96 px (cellule de rayon
    56, cadre.py). Hauteur donnee par eww.yuck (1 a 23 px) ; .spk-barres
    reserve toujours ces 23 px, pour que la mise en page ne saute pas.
    Les barres passees sont a .55, la derniere ("maintenant") en blanc plein.

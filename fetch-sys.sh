@@ -2,7 +2,7 @@
 # fetch-sys.sh - CPU / RAM / reseau pour le bandeau, en % (0-100) pour les
 # barres. Sortie : {"cpu":12,"ram":48,"net":3,"hist":{...}}
 #
-# Appele par un defpoll toutes les 5 s (voir eww.yuck). Pourquoi pas les
+# Appele par un defpoll toutes les 2 s (voir eww.yuck). Pourquoi pas les
 # variables magiques d'eww (EWW_CPU, EWW_RAM, EWW_NET) : d'apres la doc eww,
 # elles se rafraichissent toutes les 2 s, sans reglage possible. Le brief
 # demande 3 a 5 s : le dashboard ne doit pas couter du CPU pour afficher le
@@ -12,6 +12,10 @@
 # CPU et reseau sont des DIFFERENCES entre deux appels (les compteurs du
 # noyau ne font qu'augmenter) : l'etat precedent est garde dans PREV. Au
 # tout premier appel, il n'y a pas d'etat precedent : on affiche 0.
+#
+# 2 s depuis le 14/09 (et non plus 5) : les sparklines du HUD lisent la meme
+# variable "sys", et Gauthier les voulait plus vives. Le bandeau suit donc
+# le meme rythme (une seule source, voir plus bas).
 # Consequence : ce script ne doit avoir qu'UN appelant (le defpoll "sys").
 # Un second appelant fausserait les differences des deux.
 #
@@ -33,8 +37,9 @@
 # 1250000 octets/s = 10 Mbit/s.
 NET_MAX=1250000
 # Nombre de mesures gardees pour les sparklines du HUD (= nombre de barres :
-# 20 barres de 3 px + 1 px d'ecart tiennent dans un hexagone de 96 px).
-NB=20
+# 18 barres de 3 px + 1 px d'ecart = 71 px, avec de l'air de chaque cote de
+# l'hexagone de 96 px ; 20 barres touchaient ses bords, retour du 14/09).
+NB=18
 # ================================================================
 
 PREV="$HOME/.cache/eww/sys.prev"
