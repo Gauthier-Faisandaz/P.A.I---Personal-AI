@@ -636,13 +636,34 @@
 ;; aller dans eww.scss, qui ne connait pas les variables eww : d'ou le :style.
 (defwidget hud_piece [nom w h]
   (box :class "hud-piece"
-       :style "min-width: ${w}px; min-height: ${h}px; background-image: url('${EWW_CONFIG_DIR}/hud/${nom}.svg');"))
+       :style "min-width: ${w}px; min-height: ${h}px; background-image: url('${EWW_CONFIG_DIR}/hud/${nom}.svg');"
+    (children)))
+
+;; --- Heure (hexagone du haut) ------------------------------------------
+;; hud_temps : {"heure": "14:32", "date": "lun. 14 sept."}, ecrit par
+;; fetch-heure.sh a chaque changement de minute (voir ce script : pourquoi un
+;; deflisten, pourquoi pas EWW_TIME). Distinct de l'horloge du bandeau : autre
+;; format, et la colonne n'est pas touchee.
+;; Pas de secondes (demande du 14/09).
+(deflisten hud_temps :initial "{\"heure\":\"\",\"date\":\"\"}"
+  "bash ~/.config/eww/fetch-heure.sh")
+
+;; Placement : centre horizontalement dans la fenetre (0 a 131 px : c'est
+;; aussi la partie VISIBLE de l'hexagone, rogne a gauche par l'ecran), et
+;; descendu d'une marge fixe (.hud-heure dans eww.scss), car le haut de la
+;; fenetre est au-dessus de l'ecran.
+(defwidget hud_heure []
+  (box :class "hud-heure" :orientation "v" :space-evenly false
+       :hexpand true :halign "center" :valign "start"
+    (label :class "hud-heure-hm" :text {hud_temps.heure ?: ''})
+    (label :class "hud-heure-date" :text {hud_temps.date ?: ''})))
 
 (defwindow hud-heure
   :monitor 0
   :geometry (geometry :x "0px" :y "-35px" :width "131px" :height "182px" :anchor "top left")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  (hud_piece :nom "heure" :w 131 :h 182))
+  (hud_piece :nom "heure" :w 131 :h 182
+    (hud_heure)))
 
 (defwindow hud-meteo
   :monitor 0

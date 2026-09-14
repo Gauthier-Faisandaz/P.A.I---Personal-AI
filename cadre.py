@@ -257,7 +257,8 @@ def verifier(chemin_yuck):
         g = re.search(r':geometry\s+\(geometry\s+:x\s+"(-?\d+)px"\s+:y\s+"(-?\d+)px"\s+'
                       r':width\s+"(\d+)px"\s+:height\s+"(\d+)px"', corps)
         lu = tuple(int(v) for v in g.groups()) if g else None
-        m = re.search(r'\(hud_piece\s+:nom\s+"([\w-]+)"\s+:w\s+(\d+)\s+:h\s+(\d+)\s*\)', corps)
+        # (pas de ")" exige apres :h : la piece peut contenir un enfant, son contenu)
+        m = re.search(r'\(hud_piece\s+:nom\s+"([\w-]+)"\s+:w\s+(\d+)\s+:h\s+(\d+)\b', corps)
         piece_lue = (m.group(1), int(m.group(2)), int(m.group(3))) if m else None
         attendu = p['fenetre']
         if lu == attendu and piece_lue == (piece, attendu[2], attendu[3]):

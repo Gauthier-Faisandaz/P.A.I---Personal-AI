@@ -331,3 +331,22 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
   background-position: 0 0;
   background-size: auto;
 }
+
+/* --- Panneau d'angle : heure (hexagone du haut) ------------------------ */
+/* Meme police et memes blancs que la colonne (texte white / .75).
+   margin-top : la fenetre hud-heure commence 35 px AU-DESSUS de l'ecran
+   (voir cadre.py) ; 73 px la placent dans la partie visible de l'hexagone,
+   entre ses cotes verticaux (ecran y = 12 a 100). A revoir si l'hexagone
+   de l'heure change de taille ou de place dans cadre.py. */
+.hud-heure { margin-top: 73px; }
+.hud-heure-hm {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 36px;
+  font-weight: bold;
+  color: white;
+}
+.hud-heure-date {
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
