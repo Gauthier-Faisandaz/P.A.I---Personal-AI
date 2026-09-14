@@ -43,10 +43,12 @@ contour, le trait devient un escalier lui aussi (constate le 14/09). D'ou :
     tout ca -- sauf au bord gauche de l'ecran, ou l'on coupe net (une coupe
     verticale ne fait pas d'escalier, et x < 0 est interdit, voir plus haut).
 
-Couleurs (tokens de eww.scss) :
+Couleurs (tokens de eww.scss, identiques a la colonne de droite) :
     verre    rgba(255,255,255,.10)   = .panel background-color
-    contour  rgba(255,255,255,.55)   plus marque que .panel (.25) : sans
-                                     decoration, c'est lui qui dessine la forme
+    contour  rgba(255,255,255,.25)   = .panel border (demande du 14/09 : meme
+                                     trait que la colonne ; 1,4 px et non 1 px,
+                                     car un trait oblique lisse sur 1 px parait
+                                     plus pale qu'une bordure droite)
 
 ATTENTION : ce fichier genere du SVG consomme par librsvg. Rester en ASCII
 dans les chaines produites (les commentaires Python n'y vont pas).
@@ -66,7 +68,7 @@ import re
 import sys
 
 VERRE   = 'rgba(255,255,255,.10)'
-CONTOUR = 'rgba(255,255,255,.55)'
+CONTOUR = 'rgba(255,255,255,.25)'
 TRAIT = 1.4          # epaisseur du contour (px), trait entier et lisse
 MARGE = 3            # vide autour des hexagones dans leur fenetre (px)
 DILATATION = 2       # forme X Shape = hexagones de rayon R + 2 (~1,7 px de plus)
