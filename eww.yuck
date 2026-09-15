@@ -1,5 +1,5 @@
 ;; ~/.config/eww/eww.yuck - Viridis Lab : colonne (recommandations, a venir,
-;;                          boite de reception, veille) + bandeau (verre)
+;;                          boite de reception, veille), en verre
 ;; Demarrage :  voir start.sh (ouvre toutes les fenetres sur le bon ecran)
 ;; Recharger :  eww reload
 ;;
@@ -147,7 +147,8 @@
     ;; Corps : separateur + liste, masques quand le panneau est replie, ET
     ;; tant qu'il est plus petit que seuil_corps : pendant l'animation d'un
     ;; depli, la liste attend d'avoir la place (sinon elle deborderait et
-    ;; pousserait le bandeau). Au repli, elle disparait des la 1re image.
+    ;; pousserait les panneaux du dessous). Au repli, elle disparait des la
+    ;; 1re image.
     (box :class "sep" :visible {!replie && hauteur >= seuil_corps})
     ;; Le scroll (vertical seulement) absorbe le contenu qui depasse ; les
     ;; labels non wrappes ont :truncate true pour ne pas elargir la fenetre.
@@ -472,21 +473,15 @@
 
 
 ;; ==========================================================================
-;;  BANDEAU  (bas de la colonne : une ligne fixe, VIDE pour l'instant)
+;;  COLLECTEUR SYSTEME
 ;; ==========================================================================
-;; Vide depuis le 14/09 (demande utilisateur) : l'heure est desormais dans le
-;; panneau d'angle, CPU / RAM / NET dans ses sparklines. La boite est gardee,
-;; a sa hauteur ($bandeau-haut + bordures, eww.scss) : la colonne ne bouge
-;; pas et BANDEAU dans mise-en-page.py reste juste. Ancien contenu (horloge,
-;; compteur "en vrac" de fetch-vrac.sh, trois jauges) : voir l'historique
-;; git, commit b7bd7d8 et avant.
-(defwidget bandeau []
-  (box :class "bandeau"))
-
-;; --- sys : CPU / RAM / reseau en % (voir fetch-sys.sh, et pourquoi pas les
-;;     variables magiques EWW_CPU & co). Plus affiche dans le bandeau, mais lu
-;;     par les sparklines du panneau d'angle (plus bas). Toutes les 2 s depuis
-;;     le 14/09 (5 s avant).
+;; sys : CPU / RAM / reseau en % (voir fetch-sys.sh, et pourquoi pas les
+;; variables magiques EWW_CPU & co). Lu par les sparklines du panneau
+;; d'angle (plus bas). Toutes les 2 s depuis le 14/09 (5 s avant).
+;; Il etait declare avec le bandeau du bas de la colonne, vide le 14/09 puis
+;; supprime le 15/09 ("laisser la colonne respirer"). Ancien contenu du
+;; bandeau (horloge, compteur "en vrac" de fetch-vrac.sh, trois jauges) :
+;; historique git, commit b7bd7d8 et avant.
 (defpoll sys :interval "2s" :initial "{\"cpu\":0,\"ram\":0,\"net\":0}"
   "bash ~/.config/eww/fetch-sys.sh")
 
@@ -499,7 +494,8 @@
 ;; Pourquoi une seule fenetre : avant, chaque panneau avait la sienne, et
 ;; tout changement de taille obligeait a recalculer a la main la geometrie
 ;; des autres. Ici les panneaux sont empiles dans une vbox, a l'interieur
-;; d'une fenetre de hauteur FIXE (c'est ce qui colle le bandeau en bas).
+;; d'une fenetre de hauteur FIXE : le dernier panneau s'arrete pile a la
+;; marge du bas.
 ;;
 ;; Geometrie : meme marge en haut et en bas de l'ecran (symetrie). Il
 ;; faudrait donc une hauteur "100% - 2 x marge", mais eww 0.6.0 refuse de
@@ -508,7 +504,8 @@
 ;; ARGUMENTS de fenetre, calcules et passes par ouvrir-colonne.sh a
 ;; l'ouverture (eww open colonne --arg marge=20px --arg hauteur=1040px
 ;; --arg droite=-48px) :
-;;   marge   = ecart bord de l'ecran <-> haut de la colonne (et bas du bandeau)
+;;   marge   = ecart bord de l'ecran <-> haut de la colonne (et bas du
+;;             dernier panneau)
 ;;   hauteur = hauteur de l'ecran cible (lue par xrandr) - 2 x marge
 ;;   droite  = ecart au bord droit, NEGATIF (anchor right : x negatif = vers
 ;;             la gauche depuis le bord droit), pour le panneau LXQt
@@ -523,34 +520,30 @@
 ;; 16px d'ecart entre panneaux (:spacing) apparaissent donc floutes, sans
 ;; le voile blanc ni la bordure des panneaux.
 ;;
-;; !! L'ecart (:spacing 16, sur les DEUX box ci-dessous) et la largeur
+;; !! L'ecart (:spacing 16 de la box ci-dessous) et la largeur
 ;; (:width "33%") sont DOUBLES dans mise-en-page.py (ECART, LARGEUR_PCT) :
 ;; a modifier aux deux endroits.
 (defwindow colonne [marge hauteur droite]
   :monitor 0
   :geometry (geometry :x droite :y marge :width "33%" :height hauteur :anchor "top right")
   :stacking "bg" :windowtype "dock" :wm-ignore false
-  ;; Deux niveaux de box, pour le repli :
-  ;;  - "panneaux" (:vexpand true) prend toute la hauteur au-dessus du
-  ;;    bandeau. Ses panneaux ont les hauteurs de mise-en-page.py, qui la
-  ;;    remplissent exactement... sauf quand TOUT est replie : les en-tetes
-  ;;    restent alors empiles en haut, et le vide en dessous laisse voir le
-  ;;    fond d'ecran (mode bureau calme).
-  ;;  - le bandeau, dernier enfant de "colonne", reste donc colle en bas
-  ;;    dans tous les cas.
-  ;; Ecarts : 3 entre les quatre panneaux + 1 entre "panneaux" et le
-  ;; bandeau = 4 = n x ECART dans mise-en-page.py.
-  (box :class "colonne" :orientation "v" :space-evenly false :spacing 16
-    ;; Ordre = un degrade d'urgence : qu'est-ce que je fais maintenant ->
-    ;; qu'est-ce qui est engage -> qu'est-ce qui demande une reponse ->
-    ;; qu'est-ce qui bouge dans mon domaine. La veille, seule chose sans
-    ;; echeance, vient en dernier : elle ne s'intercale pas dans ce qui en a.
-    (box :class "panneaux" :orientation "v" :space-evenly false :spacing 16 :vexpand true
-      (recos_box)
-      (venir_box)
-      (digest_box)
-      (veille_box))
-    (bandeau)))
+  ;; Une seule box : les panneaux, empiles avec les hauteurs de
+  ;; mise-en-page.py, qui remplissent exactement la fenetre... sauf quand
+  ;; TOUT est replie : les en-tetes restent alors empiles en haut, et le vide
+  ;; en dessous laisse voir le fond d'ecran (mode bureau calme).
+  ;; Plus de bandeau depuis le 15/09 (demande utilisateur : "laisser la
+  ;; colonne respirer") : il n'y avait une box de plus que pour lui.
+  ;; Ecarts : 3 entre les quatre panneaux = (n - 1) x ECART dans
+  ;; mise-en-page.py.
+  ;; Ordre = un degrade d'urgence : qu'est-ce que je fais maintenant ->
+  ;; qu'est-ce qui est engage -> qu'est-ce qui demande une reponse ->
+  ;; qu'est-ce qui bouge dans mon domaine. La veille, seule chose sans
+  ;; echeance, vient en dernier : elle ne s'intercale pas dans ce qui en a.
+  (box :class "panneaux" :orientation "v" :space-evenly false :spacing 16 :vexpand true
+    (recos_box)
+    (venir_box)
+    (digest_box)
+    (veille_box)))
 
 ;; --- Modale : fenetre SEPAREE, meme couche que la colonne (bg/dock : les
 ;; clics y fonctionnent, seul le focus clavier manque -- inutile ici).
@@ -626,7 +619,7 @@
 ;; hud_temps : {"heure": "14:32", "date": "lun. 14 sept."}, ecrit par
 ;; fetch-heure.sh a chaque changement de minute (voir ce script : pourquoi un
 ;; deflisten, pourquoi pas EWW_TIME). Seule horloge du dashboard depuis que le
-;; bandeau a ete vide (14/09).
+;; bandeau a ete vide (14/09), puis supprime (15/09).
 ;; Pas de secondes (demande du 14/09).
 (deflisten hud_temps :initial "{\"heure\":\"\",\"date\":\"\"}"
   "bash ~/.config/eww/fetch-heure.sh")
@@ -714,8 +707,8 @@
     (hud_meteo)))
 
 ;; --- Sparklines (3 hexagones : CPU, RAM, NET) -----------------------------
-;; Donnees : la variable "sys" (defpoll pres du bandeau, fetch-sys.sh, toutes
-;; les 2 s ; le bandeau lui-meme ne l'affiche plus depuis le 14/09). Pas
+;; Donnees : la variable "sys" (section COLLECTEUR SYSTEME, fetch-sys.sh,
+;; toutes les 2 s). Pas
 ;; de second collecteur : fetch-sys.sh calcule CPU et reseau par DIFFERENCE
 ;; avec l'appel precedent, deux appelants fausseraient les deux affichages.
 ;; Depuis R4, sys porte aussi l'historique : sys.hist.cpu = [{"h": 0-100,

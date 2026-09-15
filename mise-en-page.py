@@ -114,8 +114,7 @@ RECO_BAS = 8 + BORDURE + RECO_MARGE   # $reco-pad-bas + bordure + $reco-marge
 RECO_PUCE = CHASSE_12 + 8             # le "●" + $reco-puce-marge
 RECO_RETRAIT = 18      # $reco-detail-retrait
 
-BANDEAU = 38 + 2 * BORDURE            # $bandeau-haut + bordures
-ECART = 16             # :spacing des box "colonne" et "panneaux" (eww.yuck)
+ECART = 16             # :spacing de la box "panneaux" (eww.yuck)
 LARGEUR_PCT = 33       # :width "33%" de la fenetre colonne (eww.yuck)
 
 
@@ -193,7 +192,7 @@ BRIEF_V9 = dataclasses.replace(BRIEF_V8, mail_titre_section=0)
 def arrondir(hauteurs, total):
     """Arrondit a l'entier en gardant une somme EXACTEMENT egale a total
     (methode du plus fort reste). Un arrondi naif ferait gagner ou perdre
-    un pixel a la colonne selon les cas, et le bandeau bougerait."""
+    un pixel a la colonne selon les cas, et son bas bougerait."""
     entiers = [math.floor(h) for h in hauteurs]
     manque = total - sum(entiers)
     par_reste = sorted(range(len(hauteurs)),
@@ -229,8 +228,8 @@ def partager(A, besoins, plancher):
 
 
 def repartir(A, besoins, plancher, replie, hauteur_replie):
-    """A = hauteur a partager entre TOUS les panneaux (bandeau et ecarts
-    deja retires) ; besoins = hauteur naturelle de chacun ; replie = un
+    """A = hauteur a partager entre TOUS les panneaux (ecarts deja
+    retires) ; besoins = hauteur naturelle de chacun ; replie = un
     booleen par panneau, dans le meme ordre.
 
     Il n'y a pas deux mecanismes : les replies prennent leur en-tete et
@@ -238,8 +237,7 @@ def repartir(A, besoins, plancher, replie, hauteur_replie):
     travaille sur les ouverts seulement. n devient n_o, A devient A_o.
 
     Somme des hauteurs == A, sauf quand TOUT est replie : les en-tetes en
-    haut, le bandeau en bas, le fond d'ecran entre les deux (mode bureau
-    calme, permis expres)."""
+    haut, le fond d'ecran en dessous (mode bureau calme, permis expres)."""
     h = [hauteur_replie] * len(besoins)
     ouverts = [i for i, r in enumerate(replie) if not r]
     if not ouverts:
@@ -332,7 +330,7 @@ PANNEAUX = (
             8 + BORDURE),     # $reco-pad-bas + trait
     Panneau("venir", "À venir", "venir", besoin_venir, LIGNE_PAD),
     Panneau("mail", "Boîte de réception", "digest", besoin_mails, LIGNE_PAD),
-    # En DERNIER, juste au-dessus du bandeau : c'est la seule chose sans
+    # En DERNIER, en bas de la colonne : c'est la seule chose sans
     # echeance de la colonne (agir -> engage -> repondre -> lire).
     Panneau("veille", "Veille", "veille", besoin_veille, LIGNE_PAD),
 )
@@ -356,9 +354,10 @@ def calculer(donnees, c, hauteur_colonne, largeur, marge, replies=frozenset(),
     (VARS) replies ; panneaux = PANNEAUX, ou une autre liste pour rejouer un
     tableau du brief (trois panneaux avant la veille)."""
     n = len(panneaux)
-    # n panneaux + le bandeau, separes par n ecarts (voir la fenetre
-    # colonne dans eww.yuck).
-    A = hauteur_colonne - BANDEAU - n * ECART
+    # n panneaux separes par n - 1 ecarts (voir la fenetre colonne dans
+    # eww.yuck). Plus de bandeau depuis le 15/09 : ses 40 px et son ecart
+    # reviennent aux panneaux, le dernier descend jusqu'a la marge du bas.
+    A = hauteur_colonne - (n - 1) * ECART
     besoins = [p.besoin(donnees.get(p.bus) or {}, c, largeur) for p in panneaux]
     replie = [p.var in replies for p in panneaux]
     h = repartir(A, besoins, c.plancher, replie, c.replie)
@@ -537,11 +536,12 @@ def fermer_modale():
 # imposee par :height (ses transitions CSS se limitent aux couleurs et
 # autres proprietes de style), et un "revealer" eww n'anime qu'UN panneau :
 # les autres sauteraient d'un coup a leur nouvelle hauteur, et la colonne
-# deborderait le temps de l'animation (bandeau pousse hors de l'ecran).
+# deborderait le temps de l'animation (dernier panneau pousse hors de
+# l'ecran).
 # On anime donc ici : au clic, une suite d'images intermediaires, chacune
 # poussee en un "eww update", ou TOUS les panneaux glissent ensemble.
-# Depart et arrivee font chacun A au total : chaque image aussi, le bandeau
-# ne bouge jamais.
+# Depart et arrivee font chacun A au total : chaque image aussi, le bas de
+# la colonne ne bouge jamais.
 # 8 images en 0,2 s : un "eww update" coute ~20 ms (mesure le 11/09), il
 # reste ~5 ms de marge par image. Plus d'images n'irait pas plus vite : eww
 # ne suivrait pas. S'il prend du retard, l'animation dure un peu plus, mais
@@ -677,7 +677,7 @@ def rejouer_tableau(cas, c, panneaux, A):
     memes signes ▾, somme == A (sauf si tout est replie). Renvoie True si
     tout concorde."""
     ok = True
-    h_col = A + BANDEAU + len(panneaux) * ECART       # colonne ou A tombe juste
+    h_col = A + (len(panneaux) - 1) * ECART           # colonne ou A tombe juste
     larg = 9 * len(panneaux) + 3
     print(f"{'situation':34}{'obtenu':>{larg}}{'attendu':>{larg}}   somme   verdict")
     for nom, compteurs, replies, attendu in cas:
@@ -744,7 +744,7 @@ def test():
         ("Mails pleins, reste vide", dict(mails=25), (90, 90, 737)),
         ("Tous pleins", dict(recos=5, venir=14, mails=25), (174, 301, 442)),
     ]
-    h_col_917 = 917 + BANDEAU + 3 * ECART
+    h_col_917 = 917 + 2 * ECART           # 3 panneaux, donc 2 ecarts : A = 917
     print(f"{'situation':34}{'obtenu':>18}{'avant':>18}   verdict")
     for nom, compteurs, avant in cas:
         h = tuple(calculer(factices(**compteurs), BRIEF_V8, h_col_917, 633, 26,
@@ -760,7 +760,7 @@ def test():
                     for masque in range(2 ** len(VARS))]
     n = 0
     for h_col in (1040, 728):
-        A = h_col - BANDEAU - len(PANNEAUX) * ECART
+        A = h_col - (len(PANNEAUX) - 1) * ECART
         for r, v, m, w in itertools.product(range(0, 13, 3), range(0, 31, 5),
                                             range(0, 41, 5), range(0, 21, 5)):
             donnees = factices(recos=r, venir=v, mails=m, veille=w)
@@ -837,7 +837,7 @@ def test():
 
     print(f"\n6) Animation : {ANIM_IMAGES} images, constantes réelles, écran 1080,")
     print("   chaque clic possible (toute combinaison de repliés, tout panneau)\n")
-    A = 1040 - BANDEAU - len(PANNEAUX) * ECART
+    A = 1040 - (len(PANNEAUX) - 1) * ECART
     n = 0
     for compteurs in ({}, dict(recos=3, venir=7, mails=9, veille=4),
                       dict(recos=5, venir=12, mails=20, veille=8)):
@@ -854,7 +854,7 @@ def test():
                     erreurs.append("la dernière image n'est pas l'arrivée")
                 s0, s1 = sum(depart), sum(arrivee)
                 if s0 == s1 == A and any(sum(h) != A for h in suite):
-                    erreurs.append("une image ne fait pas A (le bandeau bougerait)")
+                    erreurs.append("une image ne fait pas A (le bas de la colonne bougerait)")
                 if any(not min(s0, s1) <= sum(h) <= max(s0, s1) for h in suite):
                     erreurs.append("total hors de l'intervalle départ-arrivée")
                 for i in range(len(PANNEAUX)):
@@ -870,8 +870,8 @@ def test():
                     ok = False
                     print(f"  ÉCHEC {compteurs} repliés={sorted(rep)} clic={var} : "
                           f"{', '.join(erreurs)}")
-    print(f"  {n} clics : dernière image = arrivée exacte, total constant (bandeau")
-    print("  fixe), aucun panneau ne fait demi-tour, aucun ouvert sous le plancher.")
+    print(f"  {n} clics : dernière image = arrivée exacte, total constant (bas de")
+    print("  la colonne fixe), aucun panneau ne fait demi-tour, aucun ouvert sous le plancher.")
     print("\nRÉSULTAT :", "tout est OK" if ok else "ÉCHEC")
     return ok
 

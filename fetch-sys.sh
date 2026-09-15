@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# fetch-sys.sh - CPU / RAM / reseau pour le bandeau, en % (0-100) pour les
+# fetch-sys.sh - CPU / RAM / reseau pour les sparklines du panneau d'angle
+# (autrefois aussi pour le bandeau, supprime le 15/09), en % (0-100) pour les
 # barres. Sortie : {"cpu":12,"ram":48,"net":3,"hist":{...}}
 #
 # Appele par un defpoll toutes les 2 s (voir eww.yuck). Pourquoi pas les

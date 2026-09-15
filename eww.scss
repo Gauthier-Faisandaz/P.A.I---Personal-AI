@@ -45,7 +45,6 @@ $reco-pad-bas:        8px;   /* sous une reco : padding, trait 1px...   */
 $reco-marge:          12px;  /* ... puis cette marge                    */
 $reco-puce-marge:     8px;   /* pastille -> titre (joue sur la largeur) */
 $reco-detail-retrait: 18px;  /* retrait du detail (joue sur la largeur) */
-$bandeau-haut:        38px;  /* + 2 x $bordure                          */
 
 /* Panneau replie : voile plus leger. Le texte reste dans le meme blanc
    qu'un panneau ouvert (choix utilisateur 11/09 : pas de gris-vert). */
@@ -57,8 +56,8 @@ $accent-entete:       #f5c542;
 
 * { all: unset; }
 
-/* Fond de la fenetre GTK elle-meme transparent : seuls les panneaux et le
-   bandeau (.panel, .bandeau) portent le voile blanc ; les ecarts entre eux
+/* Fond de la fenetre GTK elle-meme transparent : seuls les panneaux
+   (.panel) portent le voile blanc ; les ecarts entre eux
    restent transparents (et floutes par picom). */
 window { background-color: transparent; }
 
@@ -285,17 +284,6 @@ scrollbar slider:hover { background-color: rgba(255, 255, 255, 0.50); }
    d'ecran vert, derriere le verre (retour utilisateur 11/09). Le compteur
    voisin est a 75% de blanc : le chevron ressort sans detonner. */
 .coupe { font-size: 13px; color: white; margin-left: 8px; }
-
-/* --- Bandeau (bas de la colonne) --------------------------------------- */
-/* VIDE depuis le 14/09 : il ne reste que le verre, a la meme hauteur qu'avant
-   (min-height = $bandeau-haut, 38px + bordures) pour que la colonne ne
-   bouge pas. Les styles de l'ancien contenu (date, vrac, jauges et leurs
-   barres) sont dans l'historique git. */
-.bandeau {
-  background-color: rgba(255, 255, 255, 0.1);
-  border: $bordure solid rgba(255, 255, 255, 0.25);
-  min-height: $bandeau-haut;
-}
 
 /* --- Panneau d'angle (HUD) : cadres SVG en fond ------------------------ */
 /* Chantier independant de la colonne. Chaque piece (widget hud_piece,
