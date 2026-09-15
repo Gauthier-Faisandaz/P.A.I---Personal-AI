@@ -719,8 +719,8 @@
 ;; de second collecteur : fetch-sys.sh calcule CPU et reseau par DIFFERENCE
 ;; avec l'appel precedent, deux appelants fausseraient les deux affichages.
 ;; Depuis R4, sys porte aussi l'historique : sys.hist.cpu = [{"h": 0-100,
-;; "d": derniere ?}, ...], les 18 dernieres mesures, deja normalisees sur
-;; leur propre fenetre (voir fetch-sys.sh).
+;; "d": derniere ?}, ...], les 18 dernieres mesures, en pourcentage ABSOLU
+;; (0 a 100 : barre pleine = 100 %, voir fetch-sys.sh).
 ;; Une barre par mesure : un widget, pas une image (brief, section 5 : rien a
 ;; ecrire sur disque, rien a recharger). Hauteur : h (0-100) * 0,22 + 1 px.
 ;; Rouge (#ff6b6b) au-dela de 70 % : la valeur ET les barres (brief, seuil

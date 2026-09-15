@@ -22,13 +22,12 @@
 # Historique (panneau d'angle, R4 du 14/09) : les NB dernieres mesures de
 # chaque signal, pour les sparklines du HUD. Le HUD lit la MEME variable
 # "sys" (meme demon eww) : pas de second collecteur. Elles sont gardees dans
-# HIST (une ligne "cpu ram net" par mesure) et sorties dans "hist", deja
-# NORMALISEES sur leur propre fenetre (brief, section 4) :
-#     lo, hi = min, max de la serie ; span = max(6, hi - lo)
-#     lo, hi = lo - span * 0,15 ; hi + span * 0,15   -> hauteur 0 a 100
-# Sans ca, une serie stable a 41 % se lirait comme une jauge a moitie pleine
-# au lieu d'une ligne plate. "d" marque la derniere mesure ("maintenant").
-#     "hist": {"cpu": [{"h": 50, "d": false}, ..., {"h": 62, "d": true}], ...}
+# HIST (une ligne "cpu ram net" par mesure) et sorties dans "hist" en valeur
+# ABSOLUE : h = le pourcentage lui-meme (0 a 100) ; une barre pleine = 100 %,
+# une barre a mi-hauteur = 50 %, toujours. (Le brief demandait de normaliser
+# chaque serie sur sa propre fenetre ; Gauthier a prefere une echelle
+# absolue le 15/09.) "d" marque la derniere mesure ("maintenant").
+#     "hist": {"cpu": [{"h": 12, "d": false}, ..., {"h": 37, "d": true}], ...}
 # Les champs cpu / ram / net, eux, ne changent pas : le bandeau lit
 # exactement la meme chose qu'avant.
 
@@ -98,15 +97,11 @@ awk -v b="$busy" -v t="$total" -v pb="$pbusy" -v pt="$ptotal" \
   }
   close(hist)
 
-  # Normalisation de chaque serie sur sa propre fenetre (voir en tete).
+  # Echelle absolue (voir en tete) : la hauteur est le pourcentage lui-meme.
   for (s = 1; s <= 3; s++) {
-    lo = 1e9; hi = -1e9
-    for (i = 1; i <= m; i++) { v = V[s, i] + 0; if (v < lo) lo = v; if (v > hi) hi = v }
-    span = hi - lo; if (span < 6) span = 6
-    lo -= span * 0.15; hi += span * 0.15
     sortie = ""
     for (i = 1; i <= m; i++) {
-      h = int((V[s, i] - lo) / (hi - lo) * 100 + 0.5)
+      h = V[s, i] + 0; if (h < 0) h = 0; if (h > 100) h = 100
       sortie = sortie (i > 1 ? "," : "") "{\"h\":" h ",\"d\":" (i == m ? "true" : "false") "}"
     }
     S[s] = sortie
