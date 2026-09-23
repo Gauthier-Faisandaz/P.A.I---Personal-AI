@@ -10,11 +10,11 @@ Un point réglé est **supprimé** de ce fichier (l'historique git en garde la t
 
 ### Plusieurs agendas
 Le webhook agenda ne renvoie aujourd'hui qu'un agenda (`sourceCalendar: "Personnal"`).
-D'autres viendront : « work », et des agendas partagés (celui de la conjointe de Gauthier).
+D'autres viendront : « work », et des agendas partagés par d'autres personnes.
 - **Doublons** : un même évènement présent dans deux agendas (une invitation) apparaîtra
   deux fois. À dédoublonner (côté n8n, ou dans `fetch-venir.sh`), par exemple sur titre + heure de début.
-- **Agenda partagé** : tous les évènements de la conjointe, ou seulement ceux auxquels
-  Gauthier participe ?
+- **Agendas partagés** : tous leurs évènements, ou seulement ceux auxquels Gauthier
+  participe ?
 - Aucune distinction visuelle par agenda : la couleur est réservée au sens (urgent, retard).
 
 ### Évènements annulés
