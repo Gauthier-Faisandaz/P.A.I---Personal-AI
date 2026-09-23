@@ -1,21 +1,10 @@
 {
-  "synchro": "09:55",
-  "resume": "1 en retard · 2 aujourd'hui",
-  "groupes": [
-    { "cle": "retard", "libelle": "EN RETARD", "compte": 1, "items": [
-      { "type": "tache", "titre": "Renouveler l'hébergement o2switch", "quand": "−1 j" }
-    ]},
-    { "cle": "aujourdhui", "libelle": "AUJOURD'HUI", "date": "jeu. 10", "items": [
-      { "type": "tache", "titre": "Payer la CVEC" },
-      { "type": "tache", "titre": "Répondre à V. NABET" }
-    ]},
-    { "cle": "demain", "libelle": "DEMAIN", "date": "ven. 11", "items": [
-      { "type": "event", "titre": "Réunion SFP", "quand": "14:00" }
-    ]},
-    { "cle": "semaine", "libelle": "CETTE SEMAINE", "items": [
-      { "type": "event", "titre": "Session Studeria", "quand": "lun. 10:00" },
-      { "type": "tache", "titre": "Rendre le dossier IPSSI", "quand": "mar." }
-    ]},
-    { "cle": "plus_tard", "libelle": "PLUS TARD", "items": [] }
+  "data": [
+    { "title": "Réunion SFP",      "startDate": "2026-09-11T14:00:00+02:00", "endDate": "2026-09-11T15:00:00+02:00", "status": "confirmed", "sourceCalendar": "Personnal" },
+    { "title": "Session Studeria", "startDate": "2026-09-14T10:00:00+02:00", "endDate": "2026-09-14T12:00:00+02:00", "status": "confirmed", "sourceCalendar": "Personnal" },
+    { "title": "Anniversaire 🎂",  "startDate": "2026-09-12",                "endDate": "2026-09-12T23:59:00.000+02:00", "status": "confirmed", "sourceCalendar": "Personnal" },
+    { "title": "Point d'équipe",   "startDate": "2026-09-10T11:30:00+02:00", "endDate": "2026-09-10T12:00:00+02:00", "status": "confirmed", "sourceCalendar": "Personnal" },
+    { "title": "Hier, déjà passé", "startDate": "2026-09-09T09:00:00+02:00", "endDate": "2026-09-09T10:00:00+02:00", "status": "confirmed", "sourceCalendar": "Personnal" },
+    { "title": "Trop loin",        "startDate": "2026-09-18T09:00:00+02:00", "endDate": "2026-09-18T10:00:00+02:00", "status": "confirmed", "sourceCalendar": "Personnal" }
   ]
 }

@@ -9,34 +9,18 @@ Un point réglé est **supprimé** de ce fichier (l'historique git en garde la t
 ## À venir (agenda + tâches)
 
 ### Plusieurs agendas
-Le webhook agenda ne lit aujourd'hui qu'un agenda (`sourceCalendar: "Personnal"`).
+Le webhook agenda ne renvoie aujourd'hui qu'un agenda (`sourceCalendar: "Personnal"`).
 D'autres viendront : « work », et des agendas partagés (celui de la conjointe de Gauthier).
 - **Doublons** : un même évènement présent dans deux agendas (une invitation) apparaîtra
-  deux fois. À dédoublonner côté n8n, par exemple sur titre + heure de début.
+  deux fois. À dédoublonner (côté n8n, ou dans `fetch-venir.sh`), par exemple sur titre + heure de début.
 - **Agenda partagé** : tous les évènements de la conjointe, ou seulement ceux auxquels
   Gauthier participe ?
 - Aucune distinction visuelle par agenda : la couleur est réservée au sens (urgent, retard).
 
 ### Évènements annulés
 Pour l'instant ils sont affichés (`status: "cancelled"`), sans signe distinctif.
-Décision de Gauthier (23/09) : on verra plus tard. Le filtre se ferait côté n8n.
-
-### D'où viennent les tâches Taskwarrior
-Taskwarrior est sur cette machine ; n8n est distant. Aujourd'hui **aucun chemin** ne fait
-passer les tâches vers n8n (pas de table miroir, pas de synchro, pas de cron).
-Lié au point suivant : si le regroupement se fait localement, `fetch-venir.sh` peut lire
-Taskwarrior directement (comme `fetch-vrac.sh`), et la question disparaît.
-
-### Libellés et groupes calculés localement (en discussion, 23/09)
-Proposition de Gauthier : n8n n'envoie que les évènements bruts (ce que le webhook fait déjà),
-et le script local calcule les groupes (EN RETARD / AUJOURD'HUI / DEMAIN / PROCHAINS JOURS)
-et leurs libellés à partir des dates. Contredit la règle 3 du brief v9 (« regroupement côté
-n8n ») : à acter par Gauthier avant de coder.
-
-### Brancher le webhook
-Adresse de production connue (webhook agenda). À mettre dans `URL=` de `fetch-venir.sh`
-**une fois** que la réponse a la forme attendue par le script — sinon le panneau affiche
-« n8n injoignable ».
+Décision de Gauthier (23/09) : on verra plus tard. Le filtre tient en une ligne dans
+`fetch-venir.sh` (le champ `status` arrive déjà du webhook).
 
 ---
 
@@ -59,13 +43,15 @@ Les plafonds du brief (3 / 7 / 7 / 4) ne suffisent pas avec les vraies constante
 22 px. Chiffres à choisir par Gauthier ; outil : `python3 mise-en-page.py simuler --help`.
 
 ### Comportement quand n8n est injoignable
-Aujourd'hui le panneau se **vide** (« n8n injoignable ») et son heure de synchro reste
+Aujourd'hui le panneau se **vide** (« n8n injoignable » ; pour À venir, seules les tâches
+restent, avec « agenda injoignable ») et son heure de synchro reste
 à jour, au lieu de garder la dernière réponse et de laisser l'heure vieillir.
 (`fetch-meteo.sh` garde déjà la dernière réponse : modèle possible.) À décider.
 
 ### Contrat n8n ↔ eww
-Écrire les fiches « Veille » et « À venir » dans `docs/contrat-bus-n8n.md` (proposé le 23/09),
-une fois la question des libellés tranchée.
+Écrire les fiches « Veille » et « À venir » dans `docs/contrat-bus-n8n.md` (proposé le 23/09).
+Pour À venir, le contrat est désormais simple : n8n renvoie les évènements BRUTS de sa table
+(`title`, `startDate`, `endDate`) ; `fetch-venir.sh` groupe et lit Taskwarrior en local.
 
 ---
 

@@ -198,15 +198,16 @@
 ;; ==========================================================================
 ;;  A VENIR  (evenements agenda + taches datees ; auto-refresh 30 min)
 ;; ==========================================================================
-;; La liste arrive DEJA fusionnee, triee, groupee et resumee par n8n : voir
-;; fetch-venir.sh pour le contrat de donnees. eww ne fait qu'afficher : un
-;; groupe = un titre + ses lignes, le glyphe distingue les deux sources.
-;; Pas de detail au clic.
+;; La liste arrive DEJA fusionnee, triee, groupee et resumee par
+;; fetch-venir.sh (n8n ne fournit que les evenements bruts de l'agenda,
+;; Taskwarrior est lu en local) : voir ce script pour le contrat de
+;; donnees. eww ne fait qu'afficher : un groupe = un titre + ses lignes, le
+;; glyphe distingue les deux sources. Pas de detail au clic.
 ;; 30 min (10 avant, le 23/09) : n8n ne relit l'agenda que toutes les 3 h,
 ;; inutile de l'interroger plus souvent. Mais pas 3 h non plus : c'est a
-;; l'appel que le webhook range les evenements (aujourd'hui / demain...) ;
-;; a 3 h, un ajout mettrait jusqu'a 6 h a paraitre et DEMAIN resterait
-;; affiche jusqu'a 3 h du matin. Le bouton ↻ force un appel.
+;; chaque appel que fetch-venir.sh range les evenements (aujourd'hui /
+;; demain...) ; a 3 h, un ajout mettrait jusqu'a 6 h a paraitre et DEMAIN
+;; resterait affiche jusqu'a 3 h du matin. Le bouton ↻ force un appel.
 (defpoll venir :interval "30m" :initial "{\"groupes\":[]}"
   "bash ~/.config/eww/fetch-venir.sh")
 

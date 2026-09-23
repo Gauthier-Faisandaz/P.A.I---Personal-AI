@@ -1,0 +1,7 @@
+[
+  { "description": "Renouveler l'hébergement o2switch", "due": "20260908T220000Z", "status": "pending" },
+  { "description": "Payer la CVEC",                     "due": "20260909T220000Z", "status": "pending" },
+  { "description": "Répondre à V. NABET",               "due": "20260910T215959Z", "status": "pending" },
+  { "description": "Rendre le dossier IPSSI",           "due": "20260915T080000Z", "status": "pending" },
+  { "description": "Idée sans date",                                             "status": "pending" }
+]
