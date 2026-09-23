@@ -14,6 +14,9 @@ fi
 [ -z "$OUT" ] && OUT='{}'
 printf '%s' "$OUT" | python3 -c '
 import sys, json, datetime
+import os
+sys.path.insert(0, os.path.expanduser("~/.config/eww"))
+from nettoyer import propre    # sans emoji, espaces normalises
 LABELS = {"a_traiter":"À TRAITER","en_attente":"EN ATTENTE"}
 def mails(raw):
     if isinstance(raw, list):
@@ -44,10 +47,10 @@ def short(s, n=55):
     return (s[:n].rstrip()+" [...]") if len(s) > n else s
 def norm(m):
     mid=m.get("mail_id") or ""
-    frm=m.get("sender_name") or m.get("from") or ""
+    frm=propre(m.get("sender_name") or m.get("from"))
     cat=(m.get("category") or "").strip()
     age=age_from(m.get("createdAt") or m.get("date") or "")
-    subj=m.get("mail_title") or m.get("subject") or "(sans objet)"
+    subj=propre(m.get("mail_title") or m.get("subject")) or "(sans objet)"
     return {"subject":subj,"subject_short":short(subj),
             "from":frm,"email":m.get("sender_email") or "","age":age,
             "meta":" · ".join(p for p in (frm,age) if p),

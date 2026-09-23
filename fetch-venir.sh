@@ -41,6 +41,9 @@ fi
 
 printf '%s' "$OUT" | python3 -c '
 import sys, json, datetime
+import os
+sys.path.insert(0, os.path.expanduser("~/.config/eww"))
+from nettoyer import propre    # sans emoji, espaces normalises
 
 source = sys.argv[1]
 maintenant = datetime.datetime.now().strftime("%H:%M")
@@ -81,11 +84,11 @@ for g in obj.get("groupes") or []:
         if not isinstance(it, dict):
             continue
         items.append({"type":  "event" if it.get("type") == "event" else "tache",
-                      "titre": str(it.get("titre") or "(sans titre)"),
+                      "titre": propre(it.get("titre")) or "(sans titre)",
                       "quand": str(it.get("quand") or "")})
     if not items:
         continue                       # groupe vide : pas de titre orphelin
-    entete = str(g.get("libelle") or "")
+    entete = propre(g.get("libelle"))
     if g.get("date"):
         entete += " · " + str(g["date"])
     if g.get("compte") not in (None, ""):

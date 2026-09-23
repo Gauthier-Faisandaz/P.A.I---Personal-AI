@@ -44,6 +44,9 @@ fi
 
 printf '%s' "$OUT" | python3 -c '
 import sys, json, datetime, hashlib
+import os
+sys.path.insert(0, os.path.expanduser("~/.config/eww"))
+from nettoyer import propre    # sans emoji, espaces normalises
 
 origine = sys.argv[1]                 # "n8n" ou "exemple"
 maintenant = datetime.datetime.now().strftime("%H:%M")
@@ -99,7 +102,7 @@ items, by_id = [], {}
 for k, it in enumerate(obj.get("items") or []):
     if not isinstance(it, dict):
         continue
-    titre = str(it.get("titre") or "(sans titre)")
+    titre = propre(it.get("titre")) or "(sans titre)"
     url = url_sure(it.get("url"))
     # id STABLE, tire de l url (a defaut, du titre) et non de la position
     # dans la liste : si un article arrive en tete pendant que la modale est
@@ -108,7 +111,7 @@ for k, it in enumerate(obj.get("items") or []):
     ident = hashlib.sha1((url or titre).encode()).hexdigest()[:12]
     if ident in by_id:                    # meme article en double
         ident += "-" + str(k)
-    src = str(it.get("source") or "")
+    src = propre(it.get("source"))
     age = str(it.get("age") or "")
     x = {"id": ident, "titre": titre, "source": src, "age": age,
          "meta": " · ".join(p for p in (src, age) if p),   # "newsletter · 3 h"

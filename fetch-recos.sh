@@ -19,6 +19,9 @@ OUT="$(curl -s --netrc --max-time 8 "$URL")"
 
 printf '%s' "$OUT" | python3 -c '
 import sys, json, datetime
+import os
+sys.path.insert(0, os.path.expanduser("~/.config/eww"))
+from nettoyer import propre    # sans emoji, espaces normalises
 
 def find_list(x):
     """Localise la liste des recommandations dans nimporte quelle enveloppe."""
@@ -44,14 +47,14 @@ PRIO = {"high": "haute", "medium": "moyenne", "low": "basse",
 
 def norm(e):
     if not isinstance(e, dict):
-        return {"titre": str(e), "detail": "", "priorite": "basse"}
+        return {"titre": propre(e), "detail": "", "priorite": "basse"}
     titre  = e.get("titre")  or e.get("title") or e.get("nom")  or e.get("name") or ""
     detail = (e.get("detail") or e.get("description") or e.get("text") or e.get("raison")
               or e.get("contexte") or "")
     prio   = str(e.get("priorite") or e.get("priority") or e.get("prio") or "basse").lower()
     if e.get("urgent") in (True, "true", 1):   # format cible du brief
         prio = "haute"
-    return {"titre": titre, "detail": detail, "priorite": PRIO.get(prio, "basse")}
+    return {"titre": propre(titre), "detail": propre(detail), "priorite": PRIO.get(prio, "basse")}
 
 try:
     raw = json.load(sys.stdin)
