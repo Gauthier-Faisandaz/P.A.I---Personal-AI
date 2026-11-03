@@ -2,7 +2,7 @@
 
 Exports (JSON) des workflows n8n qui alimentent le panneau **Boîte de réception** du dashboard. Seule la partie "digest mail" est incluse ici (le tri des mails Gmail par IA jusqu'à leur exposition via webhook) ; l'automatisation "recommandations du jour" et "agenda" n'en font pas partie.
 
-Version actuelle : **v5** (amélioration du tri : contenu nettoyé, type d'expéditeur, règles forcées).
+Version actuelle : **v5** (amélioration du tri : contenu nettoyé, type d'expéditeur, règles forcées, LLM limité à l'extraction de faits). Résultats de la première revue manuelle : [`docs/revue-tri-2026-11-03.md`](docs/revue-tri-2026-11-03.md).
 
 ## Pipeline
 
@@ -10,16 +10,18 @@ Version actuelle : **v5** (amélioration du tri : contenu nettoyé, type d'expé
 2. **`02-sub-determine-data-table.json`** — trouve ou crée la data table du projet (`PAI_Emails`) et renvoie son id.
 3. **`03-organize-mail.json`** — tri des mails :
    - chaque mail passe d'abord par **`03b-sub-apply-rules.json`** (règles forcées) ; s'il correspond à une règle, sa catégorie est écrite directement (`category_origin = regle`) sans appel au LLM ;
-   - sinon un agent IA (Mistral, repli sur Groq) le classe en catégorie (`urgent` / `a_traiter` / `en_attente` / `ignorer`), détecte l'intention et une éventuelle deadline (`category_origin = llm`). Le prompt reçoit la date du jour et un contenu tronqué à 2 000 caractères (1 600 au début + 400 à la fin) ;
+   - sinon un agent IA (Ministral 14B, température 0, repli sur Gemini Flash Lite via OpenRouter) **constate des faits** sans juger l'importance du mail : `action` (`repondre` / `agir` / `attendre` / `lire` / `rien`), `domaine` (`emploi_formation` / `admin_finance` / `pro` / `recherche_reseau` / `perso` / `achats` / `promo`), `echeance` (AAAA-MM-JJ ou null) et une `raison` d'une phrase. Schéma catégoriel strict, sans score de confiance auto-évalué. Le prompt reçoit la date du jour en français, le nom et le type d'expéditeur, et un contenu tronqué à 2 000 caractères (1 600 au début + 400 à la fin) ;
+   - un nœud Code **« Compute category »** déduit la catégorie de ces faits : `urgent` (répondre / agir avec échéance à 2 jours ou moins), `a_traiter`, `en_attente`, `a_lire` (information utile dans un domaine important) ou `ignorer` (`category_origin = llm`) ;
    - si les deux modèles échouent, le mail passe en `02_LLM_error` (`category_origin = llm_error`) et la boucle continue au lieu de tout arrêter.
 4. **`03b-sub-apply-rules.json`** — sous-workflow 100 % nœuds natifs : croise les mails avec la data table `PAI_Email_rules`, garde les règles applicables (motif d'expéditeur et/ou motif d'objet, insensible à la casse), choisit la plus précise (deux critères > un critère, puis motif le plus long) et renvoie chaque mail avec `rule_match` / `rule_category` / `rule_note`.
 5. **`04-summarize-mail.json`** — résume en 1 à 3 phrases les mails jugés pertinents (ignore ceux catégorisés `ignorer`).
-6. **`05-mark-mail-read.json`** — tourne toutes les heures (ou à la demande) : vérifie sur Gmail si un mail traité a été lu depuis, et met à jour son statut dans la data table en conséquence.
+6. **`05-mark-mail-read.json`** — tourne toutes les heures (ou à la demande) : vérifie sur Gmail si un mail traité a été lu depuis, et met à jour son statut dans la data table en conséquence. Un mail supprimé de Gmail entre-temps est considéré comme lu, au lieu de faire échouer tout le pipeline (erreur 404).
 7. **`01-webhook-digest.json`** — webhook (auth Basic) interrogé par `fetch-digest.sh` du dashboard : lit la data table, filtre les mails `summarized`/`read` et répond en JSON.
+8. **`06-test-prompt-tri.json`** — banc de test manuel : relit des mails réels de la data table, les classe avec le prompt et le code de décision (copies à reporter à la main) et sort, pour chaque mail, l'ancienne et la nouvelle catégorie. Sert de test de non-régression avant de modifier le prompt de `03-organize-mail.json`.
 
 ## Data tables
 
-**`PAI_Emails`** — une ligne par mail. Colonnes ajoutées en v5 : `source_type`, `category_origin` (`regle` / `llm` / `llm_error`).
+**`PAI_Emails`** — une ligne par mail. Colonnes ajoutées en v5 : `source_type`, `category_origin` (`regle` / `llm` / `llm_error`), `domaine`, `echeance` (la colonne `intent` reçoit désormais l'`action`, `is_deadline` vaut vrai quand une échéance existe).
 
 **`PAI_Email_rules`** — règles forcées, appliquées avant le LLM :
 

@@ -13,7 +13,7 @@
           "conditions": [
             {
               "id": "f63ecc45-eb83-4d7b-a7d8-580a52cf93ff",
-              "leftValue": "={{ $('Get mails to check if still \"Unread\"').item.json.labelIds }}",
+              "leftValue": "={{ $('Get mails to check if still \"Unread\"').item.json.labelIds ?? [] }}",
               "rightValue": "UNREAD",
               "operator": {
                 "type": "array",
@@ -47,7 +47,7 @@
           "conditions": [
             {
               "keyName": "mail_id",
-              "keyValue": "={{ $json.id }}"
+              "keyValue": "={{ $('Get LLM_processed mails from data table').item.json.mail_id }}"
             }
           ]
         },
@@ -232,6 +232,7 @@
       "id": "a4af5b77-f1ee-4ba5-a4d5-42ee08f7cdad",
       "name": "Get mails to check if still \"Unread\"",
       "webhookId": "0e13604a-0a88-422b-ac69-1d4818830084",
+      "onError": "continueRegularOutput",
       "credentials": {
         "gmailOAuth2": {
           "id": "SJYvaZ8FZxMkn1xY",

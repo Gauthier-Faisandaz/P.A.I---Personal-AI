@@ -533,7 +533,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const h = $json.headers || {};\nconst labels = $json.labelIds || [];\nconst from = ($json.from?.value?.[0]?.address || '').toLowerCase();\nconst [local = '', domain = ''] = from.split('@');\nconst content = ($json.mail_content || '').toLowerCase();\n\n// Signaux \"envoi de masse\"\nconst isList = 'list-id' in h;\nconst hasUnsubHeader = 'list-unsubscribe' in h;\nconst isBulkPrecedence = /precedence:\\s*(bulk|list|junk)/i.test(h['precedence'] || '');\nconst isPromoLabel = labels.includes('CATEGORY_PROMOTIONS');\n\n// Signaux \"expéditeur robot\"\nconst robotLocal = /^(no-?reply|ne-?pas-?repondre|notifications?|alerts?|jobalerts.*|invitations|mailer.*|newsletter|news|info|marketing|support|hello|bonjour)([._+-].*)?$/;\nconst robotDomain = /^(e?mails?|notifications?|messagerie|info|news|newsletter|mailing|mail|campaign|marketing)\\./;\nconst isRobotSender = robotLocal.test(local) || robotDomain.test(domain);\n\n// Signal \"pied de page marketing\"\nconst hasUnsubText = /(se désabonner|désabonner|désinscri|unsubscribe|gérer (vos|mes) préférences|modifier vos préférences)/.test(content);\n\nlet source_type;\nif (isList && !isRobotSender) {\n  source_type = 'liste_diffusion';      // ErgoIHM, cherchons-pour-voir...\n} else if (isRobotSender || hasUnsubHeader || isBulkPrecedence || isPromoLabel || hasUnsubText) {\n  source_type = 'automatique';          // notifications, alertes, newsletters, prospection outillée\n} else {\n  source_type = 'humain_direct';        // quelqu'un t'écrit à toi\n}\n\nreturn {\n  json: {\n    ...$json,\n    source_type,\n    _source_signals: { isList, hasUnsubHeader, isBulkPrecedence, isPromoLabel, isRobotSender, hasUnsubText },\n  },\n};"
+        "jsCode": "const h = $json.headers || {};\nconst labels = $json.labelIds || [];\nconst from = ($json.from?.value?.[0]?.address || '').toLowerCase();\nconst [local = '', domain = ''] = from.split('@');\nconst content = ($json.mail_content || '').toLowerCase();\n\n// Signaux \"envoi de masse\"\nconst isList = 'list-id' in h;\nconst hasUnsubHeader = 'list-unsubscribe' in h;\nconst isBulkPrecedence = /precedence:\\s*(bulk|list|junk)/i.test(h['precedence'] || '');\nconst isPromoLabel = labels.includes('CATEGORY_PROMOTIONS');\n\n// Signaux \"expéditeur robot\"\nconst robotLocal = /^(no-?reply|ne-?pas-?repondre|notifications?|alerts?|jobalerts.*|invitations|mailer.*|newsletter|news|info|marketing|support|hello|bonjour)([._+-].*)?$/;\n// noreply n'importe où dans l'adresse (ex. CloudPlatform-noreply@google.com)\nconst noReplyAnywhere = /(^|[._+-])(no-?reply|do-?not-?reply|ne-?pas-?repondre)([._+-]|$)/;\nconst robotDomain = /^(e?mails?|notifications?|messagerie|info|news|newsletter|mailing|mail|campaign|marketing)\\./;\nconst isRobotSender = robotLocal.test(local) || noReplyAnywhere.test(local) || robotDomain.test(domain);\n\n// Signal \"pied de page marketing\"\nconst hasUnsubText = /(se désabonner|désabonner|désinscri|unsubscribe|gérer (vos|mes) préférences|modifier vos préférences)/.test(content);\n\nlet source_type;\nif (isList && !isRobotSender) {\n  source_type = 'liste_diffusion';      // ErgoIHM, cherchons-pour-voir...\n} else if (isRobotSender || hasUnsubHeader || isBulkPrecedence || isPromoLabel || hasUnsubText) {\n  source_type = 'automatique';          // notifications, alertes, newsletters, prospection outillée\n} else {\n  source_type = 'humain_direct';        // quelqu'un t'écrit à toi\n}\n\nreturn {\n  json: {\n    ...$json,\n    source_type,\n    _source_signals: { isList, hasUnsubHeader, isBulkPrecedence, isPromoLabel, isRobotSender, hasUnsubText },\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -543,6 +543,34 @@
       ],
       "id": "6f578abb-9bd2-4245-9e30-2d61eb9147f5",
       "name": "Detect source type"
+    },
+    {
+      "id": "b0c2df6f-9acd-4987-8f37-3ba88ca41486",
+      "name": "Keep only new mails",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        -640
+      ],
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Merge').item.json.data_table_id }}"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mail_id",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "matchType": "allConditions",
+        "operation": "rowNotExists",
+        "resource": "row"
+      }
     }
   ],
   "connections": {
@@ -662,6 +690,17 @@
       ]
     },
     "Detect source type": {
+      "main": [
+        [
+          {
+            "node": "Keep only new mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only new mails": {
       "main": [
         [
           {

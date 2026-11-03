@@ -3,26 +3,6 @@
   "nodes": [
     {
       "parameters": {
-        "model": "openai/gpt-oss-120b",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
-      "typeVersion": 1,
-      "position": [
-        736,
-        144
-      ],
-      "id": "8e078259-2d08-4718-9eaa-69e7e135d06a",
-      "name": "Groq Chat Model",
-      "credentials": {
-        "groqApi": {
-          "id": "AMbO71b6uxNhoSAf",
-          "name": "Groq account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "workflowInputs": {
           "values": [
             {
@@ -307,14 +287,14 @@
     },
     {
       "parameters": {
-        "model": "openai/gpt-oss-20b:free",
+        "model": "google/gemini-3.5-flash-lite",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
       "position": [
         736,
-        384
+        144
       ],
       "id": "ede8fac8-835e-43a9-9351-5c55a2acd186",
       "name": "OpenRouter Chat Model",
@@ -572,7 +552,7 @@
     },
     {
       "parameters": {
-        "model": "mistral-medium-latest",
+        "model": "ministral-14b-latest",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
@@ -592,17 +572,6 @@
     }
   ],
   "connections": {
-    "Groq Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Summarize interesting mail fallback",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "When Executed by Another Workflow": {
       "main": [
         [
@@ -683,7 +652,13 @@
     },
     "OpenRouter Chat Model": {
       "ai_languageModel": [
-        []
+        [
+          {
+            "node": "Summarize interesting mail fallback",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
       ]
     },
     "If mail's \"ignorer\"": {
