@@ -26,18 +26,19 @@ Décision de Gauthier (23/09) : on verra plus tard. Le filtre tient en une ligne
 
 ## Boîte de réception
 
-### Durée d'affichage des mails lus
+### Durées d'affichage
 Décidé le 9/11 : un « à lire » lu reste 24 h, un « à traiter » (ou « en attente ») lu
-reste 3 jours, puis il disparaît. Choix provisoire, **à revoir à l'usage**.
+reste 3 jours, un « à lire » non lu reste 7 jours, puis ils disparaissent.
+Choix provisoires, **à revoir à l'usage**.
 Les règles vivent dans le workflow n8n `XX_Webhook_Email_dispenser` ;
 le contrat est décrit dans `docs/contrat-bus-n8n.md`.
 
-### Mails non lus qui ne vieillissent jamais
-`04_Sync_read_status` ne vérifie le statut « lu » que des mails des 3 derniers jours.
-Un mail plus ancien, même lu dans Gmail, reste « non lu » dans la table, donc
-affiché pour toujours (règle « non lu = toujours affiché »). Dès le 10/11, des
-« à lire » du 6/11 sont concernés. À trancher côté n8n : allonger la fenêtre de 04,
-ou ne plus afficher un non-lu au-delà de N jours.
+### « À traiter » non lus de plus de 30 jours
+`04_Sync_read_status` relit le statut « lu » dans Gmail pour les 30 derniers jours
+(il le faisait sur 3 jours avant le 9/11). Un « à traiter » non lu de plus de 30 jours,
+même lu ensuite dans Gmail, restera donc « non lu », et affiché pour toujours.
+Cas rare. À surveiller : si ça arrive, limiter aussi les « à traiter » non lus dans
+le webhook, ou allonger la fenêtre de 04.
 
 ---
 

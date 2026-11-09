@@ -71,7 +71,7 @@ calcul des hauteurs (`mise-en-page.py` compte les lignes).
 |---|---|---|---|
 | À TRAITER | `urgent`, `a_traiter` | toujours affiché | affiché 3 jours après sa lecture |
 | EN ATTENTE | `en_attente` | toujours affiché | affiché 3 jours après sa lecture |
-| À LIRE | `a_lire` | toujours affiché | affiché 24 h après sa lecture |
+| À LIRE | `a_lire` | affiché 7 jours après sa réception | affiché 24 h après sa lecture |
 
 - `ignorer` n'est jamais affiché.
 - EN ATTENTE disparaît à l'étape 5 (fusion dans À LIRE) : seule la table de
@@ -83,5 +83,10 @@ calcul des hauteurs (`mise-en-page.py` compte les lignes).
   qui la touche en dernier, quand il passe le mail en `04_mail_read`
   (au plus une heure après la lecture dans Gmail). Si un autre workflow se met
   un jour à réécrire des lignes déjà lues, cette date deviendra fausse.
-- Durées (24 h, 3 jours) choisies par Gauthier le 9/11, à revoir à l'usage
+- Statut « lu » : `04_Sync_read_status` le relit dans Gmail pour les mails des
+  **30 derniers jours** (sauf « ignorer », jamais affichés). Au-delà, un mail
+  reste dans l'état où il était.
+- Pourquoi 7 jours pour un « à lire » non lu : les alertes (emploi, newsletters)
+  ne sont pas toutes lues ; sans limite, elles s'entasseraient dans le panneau.
+- Durées (24 h, 3 jours, 7 jours) choisies par Gauthier le 9/11, à revoir à l'usage
   (voir `A-FAIRE.md`).

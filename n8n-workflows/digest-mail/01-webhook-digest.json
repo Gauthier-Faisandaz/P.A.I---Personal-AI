@@ -10,7 +10,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "d4ebf421-24b8-41cd-a8ea-458daff053e6",
       "name": "Webhook",
       "webhookId": "c9d179c1-870f-4973-ae04-29f4d2c22766",
@@ -32,8 +35,14 @@
         },
         "filters": {
           "conditions": [
-            { "keyName": "status", "keyValue": "03_summarized" },
-            { "keyName": "status", "keyValue": "04_mail_read" }
+            {
+              "keyName": "status",
+              "keyValue": "03_summarized"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "04_mail_read"
+            }
           ]
         },
         "returnAll": true,
@@ -41,7 +50,10 @@
       },
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
-      "position": [208, 0],
+      "position": [
+        208,
+        0
+      ],
       "id": "970d5940-65b8-4731-9061-8cf2d0f39fc0",
       "name": "Get row(s)"
     },
@@ -56,7 +68,7 @@
               "id": "s1",
               "name": "section",
               "type": "object",
-              "value": "={{ ({\n  urgent:     { cle: 'a_traiter',  libelle: 'À TRAITER',  resume: 'à traiter',  ordre: 1, garder_lu_h: 72 },\n  a_traiter:  { cle: 'a_traiter',  libelle: 'À TRAITER',  resume: 'à traiter',  ordre: 1, garder_lu_h: 72 },\n  en_attente: { cle: 'en_attente', libelle: 'EN ATTENTE', resume: 'en attente', ordre: 2, garder_lu_h: 72 },\n  a_lire:     { cle: 'a_lire',     libelle: 'À LIRE',     resume: 'à lire',     ordre: 3, garder_lu_h: 24 }\n})[$json.category] ?? {} }}"
+              "value": "={{ ({\n  urgent:     { cle: 'a_traiter',  libelle: 'À TRAITER',  resume: 'à traiter',  ordre: 1, garder_lu_h: 72, garder_non_lu_h: null },\n  a_traiter:  { cle: 'a_traiter',  libelle: 'À TRAITER',  resume: 'à traiter',  ordre: 1, garder_lu_h: 72, garder_non_lu_h: null },\n  en_attente: { cle: 'en_attente', libelle: 'EN ATTENTE', resume: 'en attente', ordre: 2, garder_lu_h: 72, garder_non_lu_h: null },\n  a_lire:     { cle: 'a_lire',     libelle: 'À LIRE',     resume: 'à lire',     ordre: 3, garder_lu_h: 24, garder_non_lu_h: 168 }\n})[$json.category] ?? {} }}"
             },
             {
               "id": "s2",
@@ -69,6 +81,12 @@
               "name": "heures_depuis_lecture",
               "type": "number",
               "value": "={{ $now.diff(DateTime.fromISO(new Date($json.updatedAt).toISOString()), 'hours').hours }}"
+            },
+            {
+              "id": "s4",
+              "name": "heures_depuis_reception",
+              "type": "number",
+              "value": "={{ $now.diff(DateTime.fromISO(new Date($json.createdAt).toISOString()), 'hours').hours }}"
             }
           ]
         },
@@ -76,7 +94,10 @@
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [416, 0],
+      "position": [
+        416,
+        0
+      ],
       "id": "4cc3de4c-56d7-4c19-bcf6-4b77e25f7c22",
       "name": "Map category to section"
     },
@@ -92,9 +113,13 @@
           "conditions": [
             {
               "id": "f1",
-              "leftValue": "={{ !!$json.section.cle && (!$json.lu || $json.heures_depuis_lecture < $json.section.garder_lu_h) }}",
+              "leftValue": "={{ !!$json.section.cle && ($json.lu\n  ? $json.heures_depuis_lecture < $json.section.garder_lu_h\n  : (!$json.section.garder_non_lu_h || $json.heures_depuis_reception < $json.section.garder_non_lu_h)) }}",
               "rightValue": "",
-              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -103,9 +128,12 @@
       },
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.3,
-      "position": [624, 0],
+      "position": [
+        624,
+        0
+      ],
       "id": "41549ca9-8cdb-422f-8fa3-56e84a96b98a",
-      "name": "Keep displayed mails (unread, or read recently)",
+      "name": "Keep displayed mails (durations per section)",
       "alwaysOutputData": true
     },
     {
@@ -114,28 +142,108 @@
         "includeOtherFields": false,
         "assignments": {
           "assignments": [
-            { "id": "e1", "name": "mail_id", "type": "string", "value": "={{ $json.mail_id }}" },
-            { "id": "e2", "name": "mail_title", "type": "string", "value": "={{ $json.mail_title }}" },
-            { "id": "e3", "name": "sender_name", "type": "string", "value": "={{ $json.sender_name }}" },
-            { "id": "e4", "name": "sender_email", "type": "string", "value": "={{ $json.sender_email }}" },
-            { "id": "e5", "name": "createdAt", "type": "string", "value": "={{ $json.createdAt ? new Date($json.createdAt).toISOString() : '' }}" },
-            { "id": "e6", "name": "lu", "type": "boolean", "value": "={{ $json.lu === true }}" },
-            { "id": "e7", "name": "urgent", "type": "boolean", "value": "={{ $json.category === 'urgent' }}" },
-            { "id": "e8", "name": "important", "type": "boolean", "value": "={{ ['oui', true, 'true'].includes($json.important) }}" },
-            { "id": "e9", "name": "category", "type": "string", "value": "={{ $json.category }}" },
-            { "id": "e10", "name": "intent", "type": "string", "value": "={{ $json.intent }}" },
-            { "id": "e11", "name": "domaine", "type": "string", "value": "={{ $json.domaine }}" },
-            { "id": "e12", "name": "echeance", "type": "string", "value": "={{ $json.echeance }}" },
-            { "id": "e13", "name": "reason", "type": "string", "value": "={{ $json.reason }}" },
-            { "id": "e14", "name": "mail_summary", "type": "string", "value": "={{ $json.mail_summary }}" },
-            { "id": "e15", "name": "section", "type": "object", "value": "={{ $json.section ?? {} }}" }
+            {
+              "id": "e1",
+              "name": "mail_id",
+              "type": "string",
+              "value": "={{ $json.mail_id }}"
+            },
+            {
+              "id": "e2",
+              "name": "mail_title",
+              "type": "string",
+              "value": "={{ $json.mail_title }}"
+            },
+            {
+              "id": "e3",
+              "name": "sender_name",
+              "type": "string",
+              "value": "={{ $json.sender_name }}"
+            },
+            {
+              "id": "e4",
+              "name": "sender_email",
+              "type": "string",
+              "value": "={{ $json.sender_email }}"
+            },
+            {
+              "id": "e5",
+              "name": "createdAt",
+              "type": "string",
+              "value": "={{ $json.createdAt ? new Date($json.createdAt).toISOString() : '' }}"
+            },
+            {
+              "id": "e6",
+              "name": "lu",
+              "type": "boolean",
+              "value": "={{ $json.lu === true }}"
+            },
+            {
+              "id": "e7",
+              "name": "urgent",
+              "type": "boolean",
+              "value": "={{ $json.category === 'urgent' }}"
+            },
+            {
+              "id": "e8",
+              "name": "important",
+              "type": "boolean",
+              "value": "={{ ['oui', true, 'true'].includes($json.important) }}"
+            },
+            {
+              "id": "e9",
+              "name": "category",
+              "type": "string",
+              "value": "={{ $json.category }}"
+            },
+            {
+              "id": "e10",
+              "name": "intent",
+              "type": "string",
+              "value": "={{ $json.intent }}"
+            },
+            {
+              "id": "e11",
+              "name": "domaine",
+              "type": "string",
+              "value": "={{ $json.domaine }}"
+            },
+            {
+              "id": "e12",
+              "name": "echeance",
+              "type": "string",
+              "value": "={{ $json.echeance }}"
+            },
+            {
+              "id": "e13",
+              "name": "reason",
+              "type": "string",
+              "value": "={{ $json.reason }}"
+            },
+            {
+              "id": "e14",
+              "name": "mail_summary",
+              "type": "string",
+              "value": "={{ $json.mail_summary }}"
+            },
+            {
+              "id": "e15",
+              "name": "section",
+              "type": "object",
+              "value": "={{ $json.section ?? {} }}"
+            }
           ]
         },
-        "options": { "ignoreConversionErrors": true }
+        "options": {
+          "ignoreConversionErrors": true
+        }
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [832, 0],
+      "position": [
+        832,
+        0
+      ],
       "id": "9b29bdb1-a2f2-4780-8c53-1a58db5a208c",
       "name": "Fields for eww"
     },
@@ -144,17 +252,32 @@
         "type": "simple",
         "sortFieldsUi": {
           "sortField": [
-            { "fieldName": "section.ordre", "order": "ascending" },
-            { "fieldName": "urgent", "order": "descending" },
-            { "fieldName": "important", "order": "descending" },
-            { "fieldName": "createdAt", "order": "descending" }
+            {
+              "fieldName": "section.ordre",
+              "order": "ascending"
+            },
+            {
+              "fieldName": "urgent",
+              "order": "descending"
+            },
+            {
+              "fieldName": "important",
+              "order": "descending"
+            },
+            {
+              "fieldName": "createdAt",
+              "order": "descending"
+            }
           ]
         },
         "options": {}
       },
       "type": "n8n-nodes-base.sort",
       "typeVersion": 1,
-      "position": [1040, 0],
+      "position": [
+        1040,
+        0
+      ],
       "id": "ac659447-d9d3-4a88-abd0-b926e5e068b4",
       "name": "Order: section, urgent, important, newest"
     },
@@ -166,7 +289,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1248, 0],
+      "position": [
+        1248,
+        0
+      ],
       "id": "601ab98d-05f7-44ca-ae95-5d6c3985d44d",
       "name": "Group into sections + summary"
     },
@@ -177,21 +303,98 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [1456, 0],
+      "position": [
+        1456,
+        0
+      ],
       "id": "aae26f99-5bcf-491c-a893-9f9b6deec19a",
       "name": "Respond to Webhook"
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Get row(s)", "type": "main", "index": 0 }]] },
-    "Get row(s)": { "main": [[{ "node": "Map category to section", "type": "main", "index": 0 }]] },
-    "Map category to section": { "main": [[{ "node": "Keep displayed mails (unread, or read recently)", "type": "main", "index": 0 }]] },
-    "Keep displayed mails (unread, or read recently)": { "main": [[{ "node": "Fields for eww", "type": "main", "index": 0 }]] },
-    "Fields for eww": { "main": [[{ "node": "Order: section, urgent, important, newest", "type": "main", "index": 0 }]] },
-    "Order: section, urgent, important, newest": { "main": [[{ "node": "Group into sections + summary", "type": "main", "index": 0 }]] },
-    "Group into sections + summary": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Map category to section",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map category to section": {
+      "main": [
+        [
+          {
+            "node": "Keep displayed mails (durations per section)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fields for eww": {
+      "main": [
+        [
+          {
+            "node": "Order: section, urgent, important, newest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order: section, urgent, important, newest": {
+      "main": [
+        [
+          {
+            "node": "Group into sections + summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group into sections + summary": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep displayed mails (durations per section)": {
+      "main": [
+        [
+          {
+            "node": "Fields for eww",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "pinData": {},
-  "settings": { "executionOrder": "v1" },
-  "meta": { "templateCredsSetupCompleted": true }
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
 }
