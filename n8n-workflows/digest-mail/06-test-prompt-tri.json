@@ -1,0 +1,296 @@
+{
+  "name": "XX_Test_prompt_tri v5",
+  "nodes": [
+    {
+      "id": "81607c39-7aea-4e76-b675-03ef92420aa1",
+      "name": "Lancer le test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        304
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8805d8fb-7f97-48f0-a43a-8f0b54410816",
+      "name": "Mails de test",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        304
+      ],
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "lThskgFSZdvWCBJT",
+          "mode": "id"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "gte",
+              "keyName": "createdAt",
+              "keyValue": "2026-10-30T00:00:00Z"
+            },
+            {
+              "keyName": "category_origin",
+              "keyValue": "llm"
+            }
+          ]
+        },
+        "returnAll": true
+      }
+    },
+    {
+      "id": "01bf2cbb-cf4a-41d6-ac80-4eae464edd3b",
+      "name": "Shorten",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        304
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sh1",
+              "name": "mail_content",
+              "type": "string",
+              "value": "={{ (() => { const c = $json.mail_content || ''; if (c.length <= 2000) return c; return c.slice(0, 1600) + '\\n\\n[... mail raccourci ...]\\n\\n' + c.slice(-400); })() }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8ffada6a-e4f1-4517-8c8b-7afc1f34cf1d",
+      "name": "Résultats",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "c6a9b88e-3605-498f-a213-3953969d5e3e",
+      "name": "Classifier le mail",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        896,
+        304
+      ],
+      "parameters": {
+        "promptType": "define",
+        "hasOutputParser": true,
+        "text": "=Expéditeur : {{ $json.sender_name }} <{{ $json.sender_email }}>\nType d'expéditeur : {{ $json.source_type }}\nObjet : {{ $json.mail_title }}\nCorps :\n{{ $json.mail_content }}",
+        "options": {
+          "systemMessage": "=Tu tries les emails reçus par Gauthier. Nous sommes le {{ $now.setZone('Europe/Paris').setLocale('fr').toFormat('cccc d LLLL yyyy') }} ({{ $now.setZone('Europe/Paris').toFormat('yyyy-MM-dd') }}).\n\n# Qui est Gauthier\nGauthier est en recherche active d'emploi (CDI ou intérim) et en reconversion vers la maintenance industrielle et l'électricité (formation TSMI en cours de montage). Il termine quelques missions freelance en automatisation n8n / IA et reste abonné à des listes de recherche en IHM.\n\n# Ta tâche\nLis l'email et remplis quatre champs. Tu constates des faits : tu ne juges pas l'importance du mail, un programme s'en charge ensuite à partir de tes réponses.\n\n## action — ce que l'email attend de Gauthier\n- \"repondre\" : une personne attend une réponse écrite de Gauthier (question posée, demande de confirmation, proposition à accepter ou refuser).\n- \"agir\" : Gauthier doit faire quelque chose d'autre qu'une réponse : envoyer un document, payer, compléter un formulaire, se connecter pour régler un problème, s'inscrire ou valider avant une date.\n- \"attendre\" : Gauthier a déjà fait sa part et attend une réponse ou une livraison d'un tiers (candidature reçue, dossier à l'étude, devis transmis à un client).\n- \"lire\" : information potentiellement utile, sans action demandée (offres d'emploi, annonce d'un collectif, invitation à un événement, message d'une liste de diffusion).\n- \"rien\" : aucun intérêt pratique (publicité, newsletter générique, notification automatique sans conséquence, confirmation de routine).\n\nUn email commercial qui dit « répondez », « réservez », « profitez » ou « inscrivez-vous » n'est ni \"repondre\" ni \"agir\" : c'est \"rien\".\n\n## domaine\n- \"emploi_formation\" : offres d'emploi, candidatures, recruteurs, écoles, organismes de formation, France Travail.\n- \"admin_finance\" : banque, impôts, assurance maladie, administrations, factures, paiements.\n- \"pro\" : missions freelance, clients, partenaires, collectif de freelances, comptes et outils professionnels (cloud, API).\n- \"recherche_reseau\" : listes de diffusion de recherche, conférences, réseaux académiques ou professionnels.\n- \"perso\" : famille, amis, rendez-vous personnels.\n- \"achats\" : commandes, livraisons, abonnements.\n- \"promo\" : publicité, newsletter commerciale, prospection non sollicitée.\n\n## echeance\nLa date avant laquelle Gauthier doit agir ou répondre, au format AAAA-MM-JJ, uniquement si l'email en donne une (date explicite, ou relative comme « demain » ou « avant vendredi », que tu convertis à partir de la date du jour). Sinon null.\nLa date d'un événement ou la fin d'une promotion ne sont PAS des échéances, sauf si Gauthier doit faire quelque chose avant (s'inscrire, confirmer, payer).\n\n## raison\nUne phrase courte qui justifie action et domaine en citant l'élément décisif de l'email.\n\n# Indications sur l'expéditeur\nLe champ « Type d'expéditeur » est calculé automatiquement et peut se tromper :\n- humain_direct : une personne écrit directement à Gauthier ;\n- liste_diffusion : message envoyé à une liste ;\n- automatique : notification, alerte, newsletter ou envoi groupé.\n\n# Exemples\n\nEmail (reçu le jeudi 15 octobre 2026) — Expéditeur : Julie Martin <j.martin@acme-industrie.fr> — Type : humain_direct — Objet : Entretien technicien de maintenance — Corps : « Bonjour Gauthier, suite à votre candidature, pouvez-vous me confirmer votre disponibilité pour un entretien mardi 20 octobre à 14h ? Merci de me répondre d'ici lundi. »\nRéponse : {\"action\": \"repondre\", \"domaine\": \"emploi_formation\", \"echeance\": \"2026-10-19\", \"raison\": \"La recruteuse demande de confirmer une disponibilité d'entretien avant lundi.\"}\n\nEmail — Expéditeur : Indeed <alert@indeed.com> — Type : automatique — Objet : 5 nouvelles offres pour Technicien de maintenance — Corps : « 5 nouvelles offres correspondent à votre recherche : Technicien de maintenance H/F, Arras… »\nRéponse : {\"action\": \"lire\", \"domaine\": \"emploi_formation\", \"echeance\": null, \"raison\": \"Alerte d'offres d'emploi correspondant à sa recherche, sans action demandée.\"}\n\nEmail — Expéditeur : MaBoutique <news@maboutique.fr> — Type : automatique — Objet : -30 % jusqu'à dimanche — Corps : « Profitez de -30 % sur tout le site jusqu'à dimanche minuit ! »\nRéponse : {\"action\": \"rien\", \"domaine\": \"promo\", \"echeance\": null, \"raison\": \"Promotion commerciale ; la fin de l'offre n'engage pas Gauthier.\"}\n\nEmail — Expéditeur : Service admissions <admissions@cfa-exemple.fr> — Type : humain_direct — Objet : Votre dossier — Corps : « Nous avons bien reçu votre dossier. Il sera étudié en commission le 22 octobre et nous reviendrons vers vous. »\nRéponse : {\"action\": \"attendre\", \"domaine\": \"emploi_formation\", \"echeance\": null, \"raison\": \"Le dossier de Gauthier est reçu et sera étudié en commission ; la date est celle de la commission, pas une échéance pour lui.\"}\n\nEmail — Expéditeur : Ma Banque <noreply@mabanque.fr> — Type : automatique — Objet : Activez votre nouvelle carte — Corps : « Votre carte arrive à expiration. Activez la nouvelle carte avant le 31 octobre 2026 depuis votre espace client. »\nRéponse : {\"action\": \"agir\", \"domaine\": \"admin_finance\", \"echeance\": \"2026-10-31\", \"raison\": \"La banque demande d'activer la nouvelle carte avant le 31 octobre.\"}"
+        }
+      },
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "511927a5-5ae6-4c45-be6f-b5e6b531a958",
+      "name": "Ministral 14B",
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        912,
+        528
+      ],
+      "parameters": {
+        "model": "ministral-14b-latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "hchHMMqr0pVXwgdx",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "id": "ba9bea3a-7ba8-46d3-b9a5-38f52eea03e3",
+      "name": "Schéma de sortie",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        528
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"action\": { \"type\": \"string\", \"enum\": [\"repondre\", \"agir\", \"attendre\", \"lire\", \"rien\"], \"description\": \"Ce que l'email attend de Gauthier.\" },\n    \"domaine\": { \"type\": \"string\", \"enum\": [\"emploi_formation\", \"admin_finance\", \"pro\", \"recherche_reseau\", \"perso\", \"achats\", \"promo\"], \"description\": \"Thème de l'email.\" },\n    \"echeance\": { \"type\": [\"string\", \"null\"], \"description\": \"Date limite au format AAAA-MM-JJ, ou null.\" },\n    \"raison\": { \"type\": \"string\", \"description\": \"Une phrase qui justifie action et domaine.\" }\n  },\n  \"required\": [\"action\", \"domaine\", \"echeance\", \"raison\"],\n  \"additionalProperties\": false\n}"
+      }
+    },
+    {
+      "id": "3390e9b9-3df8-4bf1-b904-e33402e4bfa9",
+      "name": "Calculer la catégorie",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        304
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const o = $json.output || {};\nconst mail = $('Loop Over Items').item.json;\nconst today = DateTime.now().setZone('Europe/Paris').startOf('day');\nlet days_left = null;\nif (o.echeance) {\n  const d = DateTime.fromISO(o.echeance, { zone: 'Europe/Paris' });\n  if (d.isValid) days_left = Math.round(d.startOf('day').diff(today, 'days').days);\n}\nconst IMPORTANT = ['emploi_formation', 'admin_finance', 'pro', 'recherche_reseau', 'perso'];\nlet category = null;\nif (o.action) {\n  if (o.domaine === 'promo') category = 'ignorer';\n  else if (['repondre', 'agir'].includes(o.action)) category = (days_left !== null && days_left <= 2) ? 'urgent' : 'a_traiter';\n  else if (o.action === 'attendre') category = 'en_attente';\n  else if (o.action === 'lire') category = IMPORTANT.includes(o.domaine) ? 'a_lire' : 'ignorer';\n  else category = 'ignorer';\n}\nreturn { json: {\n  mail_id: mail.mail_id, titre: mail.mail_title, expediteur: mail.sender_email, source_type: mail.source_type,\n  ancienne_categorie: mail.category, ancienne_origine: mail.category_origin,\n  action: o.action ?? null, domaine: o.domaine ?? null, echeance: o.echeance ?? null, days_left,\n  nouvelle_categorie: category, raison: o.raison ?? null, error: $json.error ?? null\n} };"
+      }
+    },
+    {
+      "id": "fc83d0fb-8a81-498f-9b33-1eaee7e4ce3e",
+      "name": "Wait 3s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1472,
+        416
+      ],
+      "parameters": {
+        "amount": 3
+      },
+      "webhookId": "003c72a5-5686-4cbb-a8fc-fce2c841342b"
+    },
+    {
+      "id": "8f8ff872-ecef-4cec-b297-d91ca6dd2084",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        304
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Lancer le test": {
+      "main": [
+        [
+          {
+            "node": "Mails de test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mails de test": {
+      "main": [
+        [
+          {
+            "node": "Shorten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shorten": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classifier le mail": {
+      "main": [
+        [
+          {
+            "node": "Calculer la catégorie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ministral 14B": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classifier le mail",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schéma de sortie": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classifier le mail",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculer la catégorie": {
+      "main": [
+        [
+          {
+            "node": "Wait 3s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3s": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Résultats",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Classifier le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
+  }
+}

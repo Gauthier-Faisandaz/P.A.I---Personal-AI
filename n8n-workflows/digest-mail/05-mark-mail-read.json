@@ -1,4 +1,5 @@
 {
+  "name": "04_Make_global_summary v5",
   "nodes": [
     {
       "parameters": {
@@ -12,7 +13,7 @@
           "conditions": [
             {
               "id": "f63ecc45-eb83-4d7b-a7d8-580a52cf93ff",
-              "leftValue": "={{ $('Get mails to check if still \"Unread\"').item.json.labelIds }}",
+              "leftValue": "={{ $('Get mails to check if still \"Unread\"').item.json.labelIds ?? [] }}",
               "rightValue": "UNREAD",
               "operator": {
                 "type": "array",
@@ -31,7 +32,7 @@
         752,
         -880
       ],
-      "id": "018f7dce-3e3f-41de-8a69-16dbd56040a5",
+      "id": "b72efc71-dbe6-4f26-801f-fe4d10a02ff6",
       "name": "If status is \"Unread\""
     },
     {
@@ -46,7 +47,7 @@
           "conditions": [
             {
               "keyName": "mail_id",
-              "keyValue": "={{ $json.id }}"
+              "keyValue": "={{ $('Get LLM_processed mails from data table').item.json.mail_id }}"
             }
           ]
         },
@@ -176,10 +177,10 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        976,
-        -880
+        1008,
+        -800
       ],
-      "id": "9929b105-cae0-4ad3-b71f-4882a3ef935f",
+      "id": "1b643fd7-ffe1-4d9a-8d07-b821cfcc6260",
       "name": "Change mail' status \"Unread\" to \"Read\""
     },
     {
@@ -212,7 +213,7 @@
         304,
         -880
       ],
-      "id": "47318689-48d4-4d2f-a1c2-dfef0324e636",
+      "id": "4047a18d-3494-4636-970f-cb4cf0557148",
       "name": "Get LLM_processed mails from data table"
     },
     {
@@ -228,9 +229,10 @@
         528,
         -880
       ],
-      "id": "0235e89b-38d3-4fa7-a5de-6c7fab7daa89",
+      "id": "a4af5b77-f1ee-4ba5-a4d5-42ee08f7cdad",
       "name": "Get mails to check if still \"Unread\"",
-      "webhookId": "b443c64d-9561-4f8e-9d73-b33d4b6a21ff",
+      "webhookId": "0e13604a-0a88-422b-ac69-1d4818830084",
+      "onError": "continueRegularOutput",
       "credentials": {
         "gmailOAuth2": {
           "id": "SJYvaZ8FZxMkn1xY",
@@ -254,7 +256,7 @@
         80,
         -976
       ],
-      "id": "2a72de5c-d7fb-4b67-ab0a-8a7162b11770",
+      "id": "549d5bf4-caec-472a-877c-5b77c19805fe",
       "name": "When Executed by Another Workflow"
     },
     {
@@ -273,7 +275,7 @@
         80,
         -784
       ],
-      "id": "fe0ac8b3-2acd-4945-b110-2258fadccc9b",
+      "id": "e0b04aed-88d9-4fd5-b75b-1b34f77a1e7e",
       "name": "Every hour"
     }
   ],

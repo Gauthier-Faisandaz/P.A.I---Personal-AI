@@ -1,25 +1,6 @@
 {
+  "name": "03_Summarize_interesting_emails v5",
   "nodes": [
-    {
-      "parameters": {
-        "model": "llama-3.3-70b-versatile",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
-      "typeVersion": 1,
-      "position": [
-        384,
-        80
-      ],
-      "id": "d5edbd32-32a9-4d3e-8891-e994c71af145",
-      "name": "Groq Chat Model",
-      "credentials": {
-        "groqApi": {
-          "id": "AMbO71b6uxNhoSAf",
-          "name": "Groq account"
-        }
-      }
-    },
     {
       "parameters": {
         "workflowInputs": {
@@ -36,7 +17,7 @@
         -736,
         128
       ],
-      "id": "f0dcd61d-1179-484f-9459-2f9b67da3ead",
+      "id": "7b000a45-1c46-424c-abb9-0f9ea0a530aa",
       "name": "When Executed by Another Workflow"
     },
     {
@@ -69,7 +50,7 @@
         -288,
         128
       ],
-      "id": "811b6200-dc53-409a-9f3b-575618de6de9",
+      "id": "8d43812c-5645-4626-8f7a-65c7d32d2132",
       "name": "Get mail from data table"
     },
     {
@@ -228,7 +209,7 @@
         1328,
         -112
       ],
-      "id": "b48409a2-2402-4223-beea-912ddfb0e16d",
+      "id": "3ba5c512-ca9a-4fdc-8301-17684b146f1e",
       "name": "Update data table with LLM output"
     },
     {
@@ -241,7 +222,7 @@
         160,
         32
       ],
-      "id": "907dd60b-4ef9-4474-8aa0-a440c474ab05",
+      "id": "8b70d0b9-1975-4480-a1e8-d09f32df1fb0",
       "name": "Loop Over Items"
     },
     {
@@ -250,11 +231,11 @@
       "typeVersion": 1.1,
       "position": [
         1536,
-        32
+        80
       ],
-      "id": "14d82b27-b68d-4761-8228-bfb962ff6883",
+      "id": "93f639de-960c-4341-ba1e-78bbfddbc9bf",
       "name": "Wait 5s",
-      "webhookId": "a12a1967-d36f-44a8-986f-fb59360fea88"
+      "webhookId": "9028d1ac-2ad7-4c99-860a-792ece2af70d"
     },
     {
       "parameters": {
@@ -277,7 +258,7 @@
         1104,
         -112
       ],
-      "id": "90c156e3-7497-4ce2-be42-0c5cd06d853c",
+      "id": "7a584a56-2336-4bf3-8cfc-9492cbd6ef70",
       "name": "Add mail_id to LLM output"
     },
     {
@@ -300,22 +281,22 @@
         -512,
         128
       ],
-      "id": "72d53b1c-22da-4e7d-b0e5-683cc989101d",
+      "id": "21b709e5-394d-45d1-bda8-6cd49a6f9307",
       "name": "Set system prompt",
       "executeOnce": true
     },
     {
       "parameters": {
-        "model": "meta-llama/llama-3.3-70b-instruct",
+        "model": "google/gemini-3.5-flash-lite",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
       "position": [
         736,
-        176
+        144
       ],
-      "id": "26678616-2c59-4a54-b882-f249507c1f1f",
+      "id": "ede8fac8-835e-43a9-9351-5c55a2acd186",
       "name": "OpenRouter Chat Model",
       "credentials": {
         "openRouterApi": {
@@ -334,7 +315,7 @@
         1088,
         80
       ],
-      "id": "aa92bf9d-0394-4fd2-95ff-d89e64f4af83",
+      "id": "f69311bb-f6d3-4f6a-8e16-02f74b725aac",
       "name": "Stop and Error"
     },
     {
@@ -493,7 +474,7 @@
         128,
         -192
       ],
-      "id": "70dfc00a-cd7e-40d0-a8ea-83834326c89d",
+      "id": "0701d89d-db82-4cc6-8dca-0936303075c6",
       "name": "Update status for non-important mails"
     },
     {
@@ -526,7 +507,7 @@
         -64,
         128
       ],
-      "id": "5053f331-6458-40e0-b703-1919986f032b",
+      "id": "64cf0e1f-e949-412b-b0c4-b36b72eb6049",
       "name": "If mail's \"ignorer\""
     },
     {
@@ -543,7 +524,7 @@
         384,
         -96
       ],
-      "id": "921c8cbc-a81c-4a05-ab4b-d8eb3a0f4c0c",
+      "id": "ae4cf24c-005c-4ce9-b390-946224df2d1d",
       "name": "Summarize interesting mail",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -563,25 +544,34 @@
         736,
         -32
       ],
-      "id": "ab704c04-0ea5-4931-b197-864a8c195965",
+      "id": "17d51027-a833-4492-98e2-dc7a56c5fa39",
       "name": "Summarize interesting mail fallback",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
       "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": "ministral-14b-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        384,
+        80
+      ],
+      "id": "8de13484-42c6-422e-ba3b-286fde61dc24",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "hchHMMqr0pVXwgdx",
+          "name": "Mistral Cloud account"
+        }
+      }
     }
   ],
   "connections": {
-    "Groq Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Summarize interesting mail",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "When Executed by Another Workflow": {
       "main": [
         [
@@ -720,6 +710,17 @@
           {
             "node": "Stop and Error",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize interesting mail",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]

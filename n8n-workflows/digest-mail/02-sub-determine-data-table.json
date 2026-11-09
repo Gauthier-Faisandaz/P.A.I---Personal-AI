@@ -1,4 +1,5 @@
 {
+  "name": "01-sub_Determine_data_table v5",
   "nodes": [
     {
       "parameters": {
@@ -13,7 +14,7 @@
         112,
         -272
       ],
-      "id": "89c85fa0-1514-4539-b8da-2921b55688c9",
+      "id": "21be53ee-6738-4d23-a7cc-14d7a6c29e6b",
       "name": "List all data tables",
       "alwaysOutputData": true
     },
@@ -30,7 +31,7 @@
         784,
         -368
       ],
-      "id": "6ae4acbb-a06a-47b1-9e5b-8339d6bd9828",
+      "id": "2415a482-ad52-45b0-9f87-0d2872eff820",
       "name": "Create the data table for this project"
     },
     {
@@ -64,7 +65,7 @@
         560,
         -272
       ],
-      "id": "3436c9c0-9165-44e4-abeb-eb15f633e3cd",
+      "id": "c131db53-df59-453e-a8d3-8b7c373be066",
       "name": "If the relevant data table does not exist"
     },
     {
@@ -87,7 +88,7 @@
         1008,
         -368
       ],
-      "id": "79ea795c-55f6-4909-ad36-8c9116a3f2e4",
+      "id": "cbbb56a4-88c8-452e-933e-1ea342f3c354",
       "name": "Normalize data table id (created)"
     },
     {
@@ -110,7 +111,7 @@
         1008,
         -176
       ],
-      "id": "b8e22c8c-c08c-4817-9c0d-91b6a14f401a",
+      "id": "b5aa8ed0-0ee5-4fa7-a267-0d37834ae768",
       "name": "Normalize data table id (existing)"
     },
     {
@@ -133,8 +134,24 @@
         1232,
         -272
       ],
-      "id": "4d5081c1-f2ef-438a-b5df-2d4c61932d73",
+      "id": "2fb2bc46-8f87-47b2-b93a-effe02c7f0ec",
       "name": "Normalize (merge) data table id"
+    },
+    {
+      "parameters": {
+        "content": "La structure JSON n'est potentiellement pas la même entre le Create et le List — donc {{ $json.id }} ne pointe pas forcément vers le même champ selon la branche. D'où l'utilité de deux nœuds de normalisation intermédiaires qui absorbent cette différence structurelle.\n\nLe \"merge\" est ensuite effectué à l'aide de l'expression {{ $json.data_table_id }} qui se contente de récupérer l'id du précédent node exécuté (peu importe la branche).\n\nFusionner les deux Set intermédiaires en un seul obligerait à une expression ternaire avec isExecuted, ce qui est exactement ce que cette architecture évite élégamment.",
+        "height": 784,
+        "width": 416,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -784
+      ],
+      "id": "760779b1-831a-4134-9610-b77459af0dfb",
+      "name": "Sticky Note1"
     },
     {
       "parameters": {
@@ -146,7 +163,7 @@
           ]
         }
       },
-      "id": "b401417e-73fb-4ba5-bacb-f77d7d4c287c",
+      "id": "e10cae08-4389-4ca0-a041-3392b7897d84",
       "typeVersion": 1.1,
       "name": "Start",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
@@ -185,7 +202,7 @@
         336,
         -272
       ],
-      "id": "1173b82c-41c7-496d-9358-2761ca603894",
+      "id": "32cac7b2-9ec1-4c8f-9698-db75d856e881",
       "name": "Filter only the right data table",
       "alwaysOutputData": true
     }
@@ -196,17 +213,6 @@
         [
           {
             "node": "Filter only the right data table",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create the data table for this project": {
-      "main": [
-        [
-          {
-            "node": "Normalize data table id (created)",
             "type": "main",
             "index": 0
           }
@@ -225,6 +231,17 @@
         [
           {
             "node": "Normalize data table id (existing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create the data table for this project": {
+      "main": [
+        [
+          {
+            "node": "Normalize data table id (created)",
             "type": "main",
             "index": 0
           }
@@ -253,11 +270,6 @@
         ]
       ]
     },
-    "Normalize (merge) data table id": {
-      "main": [
-        []
-      ]
-    },
     "Start": {
       "main": [
         [
@@ -267,6 +279,11 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Normalize (merge) data table id": {
+      "main": [
+        []
       ]
     },
     "Filter only the right data table": {
@@ -283,6 +300,7 @@
   },
   "pinData": {},
   "meta": {
+    "templateCredsSetupCompleted": true,
     "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
   }
 }

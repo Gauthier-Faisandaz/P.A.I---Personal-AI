@@ -1,21 +1,22 @@
 {
+  "name": "02_Organize_emails v5",
   "nodes": [
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Email reçu : - De : {{ $json.sender_email }} - Objet : {{ $json.mail_title }} - Corps : {{ $json.mail_content }}",
+        "text": "=Expéditeur : {{ $json.sender_name }} <{{ $json.sender_email }}>\nType d'expéditeur : {{ $json.source_type }}\nObjet : {{ $json.mail_title }}\nCorps :\n{{ $json.mail_content }}",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "={{ $('Set system prompt').item.json.system_prompt }}"
+          "systemMessage": "={{ $('Set system prompt').first().json.system_prompt }}"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        704,
+        928,
         -224
       ],
-      "id": "95cc67d2-5a60-4556-ada4-1962322dfab8",
+      "id": "b9cb4b3c-d226-4bee-9089-443f947da5d1",
       "name": "AI Agent",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -23,36 +24,16 @@
     },
     {
       "parameters": {
-        "model": "llama-3.3-70b-versatile",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
-      "typeVersion": 1,
-      "position": [
-        704,
-        -32
-      ],
-      "id": "8a34cb5d-2082-45ec-9902-6eed52b49270",
-      "name": "Groq Chat Model",
-      "credentials": {
-        "groqApi": {
-          "id": "AMbO71b6uxNhoSAf",
-          "name": "Groq account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "schemaType": "manual",
-        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"categorie\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"urgent\",\n        \"a_traiter\",\n        \"en_attente\",\n        \"ignorer\"\n      ],\n      \"description\": \"La catégorie de tri à appliquer, basée sur l'action requise et l'urgence.\"\n    },\n    \"intention\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"question_directe\",\n        \"rdv_propose\",\n        \"information\",\n        \"plainte\",\n        \"commercial\",\n        \"autre\"\n      ],\n      \"description\": \"L'intention principale détectée de la part de l'expéditeur.\"\n    },\n    \"deadline_detectee\": {\n      \"type\": \"boolean\",\n      \"description\": \"True si une date limite ou une temporalité urgente aujourd'hui/demain est mentionnée.\"\n    },\n    \"raison\": {\n      \"type\": \"string\",\n      \"description\": \"Explication courte (1 phrase) justifiant les choix pour faciliter le débug.\"\n    }\n  },\n  \"required\": [\n    \"categorie\",\n    \"intention\",\n    \"deadline_detectee\",\n    \"raison\"\n  ],\n  \"additionalProperties\": false\n}"
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"action\": { \"type\": \"string\", \"enum\": [\"repondre\", \"agir\", \"attendre\", \"lire\", \"rien\"], \"description\": \"Ce que l'email attend de Gauthier.\" },\n    \"domaine\": { \"type\": \"string\", \"enum\": [\"emploi_formation\", \"admin_finance\", \"pro\", \"recherche_reseau\", \"perso\", \"achats\", \"promo\"], \"description\": \"Thème de l'email.\" },\n    \"echeance\": { \"type\": [\"string\", \"null\"], \"description\": \"Date limite au format AAAA-MM-JJ, ou null.\" },\n    \"raison\": { \"type\": \"string\", \"description\": \"Une phrase qui justifie action et domaine.\" }\n  },\n  \"required\": [\"action\", \"domaine\", \"echeance\", \"raison\"],\n  \"additionalProperties\": false\n}"
       },
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        848,
+        1072,
         0
       ],
-      "id": "20310fdc-fe88-4246-a8dd-5f6f9eaa01f2",
+      "id": "baf4f239-f956-44e1-a627-8975a366fab1",
       "name": "Structured Output Parser"
     },
     {
@@ -71,7 +52,7 @@
         -432,
         -96
       ],
-      "id": "c496c9ee-e545-4ad1-8155-3a7f0a2ee360",
+      "id": "febf30f2-636f-48a1-963a-5ea4357c77a9",
       "name": "When Executed by Another Workflow"
     },
     {
@@ -101,11 +82,12 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        16,
+        0,
         -96
       ],
-      "id": "6f6549bb-9557-428d-882b-929cc501ff01",
-      "name": "Get mail from data table"
+      "id": "bede078d-72b1-4da9-b26f-1cf85bbc5bea",
+      "name": "Get mail from data table",
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -114,7 +96,7 @@
             {
               "id": "691d799a-9a61-4293-9c40-d9282a8e0f30",
               "name": "mail_content",
-              "value": "={{ $('Get mail from data table').item.json.mail_content.length > 750 ?\n\n'(500 premiers caractères) : ' + $('Get mail from data table').item.json.mail_content.slice(0,500) + ' \\n\\n[... mail raccourci ...]\\n\\n (250 derniers caractères) : ' +$('Get mail from data table').item.json.mail_content.slice(-250)\n\n: $('Get mail from data table').item.json.mail_content }}",
+              "value": "={{ (() => {\n  const c = $('Get mail from data table').item.json.mail_content || '';\n  if (c.length <= 2000) return c;\n  return c.slice(0, 1600) + '\\n\\n[... mail raccourci ...]\\n\\n' + c.slice(-400);\n})() }}",
               "type": "string"
             }
           ]
@@ -125,42 +107,18 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        256,
+        208,
         -96
       ],
-      "id": "f1847720-8e8d-4e05-bfbf-94a1130255e8",
+      "id": "3f0aa824-41b0-4193-812a-9ce7a9168b14",
       "name": "Shorten mail if longer than 750 chararacters"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "45312983-c0fd-411e-9d2a-7ce4a6eb53fe",
-              "name": "mail_id",
-              "value": "={{ $('Get mail from data table').item.json.mail_id }}",
-              "type": "string"
-            }
-          ]
-        },
-        "includeOtherFields": true,
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1632,
-        -320
-      ],
-      "id": "56628079-ec45-43f2-92d8-50f28e2d65c6",
-      "name": "Add mail_id to LLM output"
     },
     {
       "parameters": {
         "operation": "upsert",
         "dataTableId": {
           "__rl": true,
-          "value": "={{ $('When Executed by Another Workflow').item.json.data_table_id ?? 'lThskgFSZdvWCBJT' }}",
+          "value": "={{ $('When Executed by Another Workflow').first().json.data_table_id ?? 'lThskgFSZdvWCBJT' }}",
           "mode": "id"
         },
         "filters": {
@@ -172,129 +130,112 @@
           ]
         },
         "columns": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
           "mappingMode": "defineBelow",
-          "value": {
-            "is_deadline": "={{ $json.output.deadline_detectee }}",
-            "status": "02_LLM_processed",
-            "category": "={{ $json.output.categorie }}",
-            "intent": "={{ $json.output.intention }}",
-            "reason": "={{ $json.output.raison }}"
-          },
           "matchingColumns": [],
           "schema": [
             {
-              "id": "mail_id",
-              "displayName": "mail_id",
-              "required": false,
               "defaultMatch": false,
               "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "mail_title",
-              "displayName": "mail_title",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "status",
               "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
+              "id": "status",
               "readOnly": false,
-              "removed": false
+              "removed": false,
+              "required": false,
+              "type": "string"
             },
             {
-              "id": "sender_email",
-              "displayName": "sender_email",
-              "required": false,
               "defaultMatch": false,
               "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "mail_content",
-              "displayName": "mail_content",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "attachment",
-              "displayName": "attachment",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "readOnly": false,
-              "removed": true
-            },
-            {
-              "id": "category",
               "displayName": "category",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
+              "id": "category",
               "readOnly": false,
-              "removed": false
+              "removed": false,
+              "required": false,
+              "type": "string"
             },
             {
-              "id": "intent",
+              "defaultMatch": false,
+              "display": true,
               "displayName": "intent",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
+              "id": "intent",
               "readOnly": false,
-              "removed": false
+              "removed": false,
+              "required": false,
+              "type": "string"
             },
             {
-              "id": "is_deadline",
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "domaine",
+              "id": "domaine",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "echeance",
+              "id": "echeance",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
               "displayName": "is_deadline",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
+              "id": "is_deadline",
               "readOnly": false,
-              "removed": false
+              "removed": false,
+              "required": false,
+              "type": "boolean"
             },
             {
-              "id": "reason",
-              "displayName": "reason",
-              "required": false,
               "defaultMatch": false,
               "display": true,
-              "type": "string",
+              "displayName": "reason",
+              "id": "reason",
               "readOnly": false,
-              "removed": false
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "category_origin",
+              "id": "category_origin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
             }
           ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
+          "value": {
+            "category": "={{ $json.category }}",
+            "category_origin": "llm",
+            "domaine": "={{ $json.domaine }}",
+            "echeance": "={{ $json.echeance }}",
+            "intent": "={{ $json.action }}",
+            "is_deadline": "={{ $json.echeance !== null }}",
+            "reason": "={{ $json.reason }}",
+            "status": "02_LLM_processed"
+          }
         },
         "options": {}
       },
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1856,
+        2080,
         -320
       ],
-      "id": "602227dc-c692-4ee9-85d2-6ced8a384269",
+      "id": "0946cebb-4d3e-4caa-990a-c99ce2f25c2a",
       "name": "Update data table with LLM output"
     },
     {
@@ -304,10 +245,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        480,
+        704,
         -96
       ],
-      "id": "2ec60205-4a1d-407c-8b45-b9bd45425ebe",
+      "id": "40b3161d-e09e-42e9-850b-fe701a58b215",
       "name": "Loop Over Items"
     },
     {
@@ -317,44 +258,29 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2080,
+        2304,
         -96
       ],
-      "id": "b822ff97-0450-43fe-8cc0-6c53dad3885d",
+      "id": "05328ca2-201c-4371-8bd2-1ac32b3803f9",
       "name": "Wait 5s",
-      "webhookId": "6cddbbc6-297b-4ead-ab4b-94122b8df1c6"
-    },
-    {
-      "parameters": {
-        "errorMessage": "Error"
-      },
-      "type": "n8n-nodes-base.stopAndError",
-      "typeVersion": 1,
-      "position": [
-        1632,
-        -48
-      ],
-      "id": "6f2a405c-ab4a-4313-9db0-e79021404df0",
-      "name": "Stop and Error",
-      "notesInFlow": true,
-      "notes": "TODO"
+      "webhookId": "ad000be2-ae67-4bca-a2ab-f0ccc395847f"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Email reçu : - De : {{ $json.sender_email }} - Objet : {{ $json.mail_title }} - Corps : {{ $json.mail_content }}",
+        "text": "=Expéditeur : {{ $json.sender_name }} <{{ $json.sender_email }}>\nType d'expéditeur : {{ $json.source_type }}\nObjet : {{ $json.mail_title }}\nCorps :\n{{ $json.mail_content }}",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "={{ $('Set system prompt').item.json.system_prompt }}"
+          "systemMessage": "={{ $('Set system prompt').first().json.system_prompt }}"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        1280,
+        1504,
         -96
       ],
-      "id": "03f6775d-0f12-4f89-8deb-fdcd24fa8e15",
+      "id": "ec623bc9-a462-43d6-a64a-0a4e583d0fb5",
       "name": "AI Agent1",
       "retryOnFail": true,
       "maxTries": 2,
@@ -363,16 +289,16 @@
     },
     {
       "parameters": {
-        "model": "meta-llama/llama-3.3-70b-instruct",
+        "model": "google/gemini-3.5-flash-lite",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
       "typeVersion": 1,
       "position": [
-        1264,
-        128
+        1504,
+        112
       ],
-      "id": "8d6aff53-7572-4ec5-9abc-2dfad39ce009",
+      "id": "d81589d1-8f8d-46b0-baff-6dfdad33aa01",
       "name": "OpenRouter Chat Model",
       "credentials": {
         "openRouterApi": {
@@ -384,15 +310,15 @@
     {
       "parameters": {
         "schemaType": "manual",
-        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"categorie\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"urgent\",\n        \"a_traiter\",\n        \"en_attente\",\n        \"ignorer\"\n      ],\n      \"description\": \"La catégorie de tri à appliquer, basée sur l'action requise et l'urgence.\"\n    },\n    \"intention\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"question_directe\",\n        \"rdv_propose\",\n        \"information\",\n        \"plainte\",\n        \"commercial\",\n        \"autre\"\n      ],\n      \"description\": \"L'intention principale détectée de la part de l'expéditeur.\"\n    },\n    \"deadline_detectee\": {\n      \"type\": \"boolean\",\n      \"description\": \"True si une date limite ou une temporalité urgente aujourd'hui/demain est mentionnée.\"\n    },\n    \"raison\": {\n      \"type\": \"string\",\n      \"description\": \"Explication courte (1 phrase) justifiant les choix pour faciliter le débug.\"\n    }\n  },\n  \"required\": [\n    \"categorie\",\n    \"intention\",\n    \"deadline_detectee\",\n    \"raison\"\n  ],\n  \"additionalProperties\": false\n}"
+        "inputSchema": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"action\": { \"type\": \"string\", \"enum\": [\"repondre\", \"agir\", \"attendre\", \"lire\", \"rien\"], \"description\": \"Ce que l'email attend de Gauthier.\" },\n    \"domaine\": { \"type\": \"string\", \"enum\": [\"emploi_formation\", \"admin_finance\", \"pro\", \"recherche_reseau\", \"perso\", \"achats\", \"promo\"], \"description\": \"Thème de l'email.\" },\n    \"echeance\": { \"type\": [\"string\", \"null\"], \"description\": \"Date limite au format AAAA-MM-JJ, ou null.\" },\n    \"raison\": { \"type\": \"string\", \"description\": \"Une phrase qui justifie action et domaine.\" }\n  },\n  \"required\": [\"action\", \"domaine\", \"echeance\", \"raison\"],\n  \"additionalProperties\": false\n}"
       },
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1424,
+        1728,
         128
       ],
-      "id": "ee5fc6e5-bb74-4a2c-a058-78b31dfe3135",
+      "id": "bd880889-6001-489e-9c4b-b51bfe004aad",
       "name": "Structured Output Parser1"
     },
     {
@@ -402,7 +328,7 @@
             {
               "id": "33ed7b6c-2982-43ab-8232-a26b30374d3a",
               "name": "system_prompt",
-              "value": "=Tu es un assistant de tri d'emails. \n\nAnalyse l'email suivant et retourne UNIQUEMENT un objet JSON valide, sans texte avant ni après, sans balises markdown.  \n---  \nClasse cet email selon ces catégories EXCLUSIVES : \n- \"urgent\" : l'expéditeur attend une réponse ou action explicite, ET il y a une deadline aujourd'hui ou demain, OU l'expéditeur est manifestement en attente bloquante \n- \"a_traiter\" : une réponse ou action est attendue, mais sans deadline immédiate \n- \"en_attente\" : l'utilisateur a déjà agi, quelqu'un d'autre doit répondre ou livrer \n- \"ignorer\" : information seule, aucune action attendue, contenu promotionnel, newsletter  \n\nDétecte l'intention principale de l'expéditeur : \n- \"question_directe\" : une question explicite qui attend une réponse \n- \"rdv_propose\" : des dates ou créneaux sont proposés ou demandés \n- \"information\" : mise à jour, notification, rapport sans action requise \n- \"plainte\" : insatisfaction exprimée \n- \"commercial\" : prospection, offre, promotion \n- \"autre\" : ne rentre dans aucune catégorie  \n\nRègles importantes : \n- Base-toi sur l'intention de l'expéditeur, PAS sur ton estimation du temps de traitement \n- Si aucune action n'est explicitement ou implicitement attendue → \"ignorer\" \n- En cas de doute entre \"urgent\" et \"a_traiter\" → choisis \"a_traiter\" \n- En cas de doute sur tout le reste → \"ignorer\"  \n\nRetourne uniquement ce JSON : {\"categorie\": \"...\", \"intention\": \"...\", \"deadline_detectee\": true/false, \"raison\": \"...\"}",
+              "value": "=Tu tries les emails reçus par Gauthier. Nous sommes le {{ $now.setZone('Europe/Paris').setLocale('fr').toFormat('cccc d LLLL yyyy') }} ({{ $now.setZone('Europe/Paris').toFormat('yyyy-MM-dd') }}).\n\n# Qui est Gauthier\nGauthier est en recherche active d'emploi (CDI ou intérim) et en reconversion vers la maintenance industrielle et l'électricité (formation TSMI en cours de montage). Il termine quelques missions freelance en automatisation n8n / IA et reste abonné à des listes de recherche en IHM.\n\n# Ta tâche\nLis l'email et remplis quatre champs. Tu constates des faits : tu ne juges pas l'importance du mail, un programme s'en charge ensuite à partir de tes réponses.\n\n## action — ce que l'email attend de Gauthier\n- \"repondre\" : une personne attend une réponse écrite de Gauthier (question posée, demande de confirmation, proposition à accepter ou refuser).\n- \"agir\" : Gauthier doit faire quelque chose d'autre qu'une réponse : envoyer un document, payer, compléter un formulaire, se connecter pour régler un problème, s'inscrire ou valider avant une date.\n- \"attendre\" : Gauthier a déjà fait sa part et attend une réponse ou une livraison d'un tiers (candidature reçue, dossier à l'étude, devis transmis à un client).\n- \"lire\" : information potentiellement utile, sans action demandée (offres d'emploi, annonce d'un collectif, invitation à un événement, message d'une liste de diffusion).\n- \"rien\" : aucun intérêt pratique (publicité, newsletter générique, notification automatique sans conséquence, confirmation de routine).\n\nUn email commercial qui dit « répondez », « réservez », « profitez » ou « inscrivez-vous » n'est ni \"repondre\" ni \"agir\" : c'est \"rien\".\n\n## domaine\n- \"emploi_formation\" : offres d'emploi, candidatures, recruteurs, écoles, organismes de formation, France Travail.\n- \"admin_finance\" : banque, impôts, assurance maladie, administrations, factures, paiements.\n- \"pro\" : missions freelance, clients, partenaires, collectif de freelances, comptes et outils professionnels (cloud, API).\n- \"recherche_reseau\" : listes de diffusion de recherche, conférences, réseaux académiques ou professionnels.\n- \"perso\" : famille, amis, rendez-vous personnels.\n- \"achats\" : commandes, livraisons, abonnements.\n- \"promo\" : publicité, newsletter commerciale, prospection non sollicitée.\n\n## echeance\nLa date avant laquelle Gauthier doit agir ou répondre, au format AAAA-MM-JJ, uniquement si l'email en donne une (date explicite, ou relative comme « demain » ou « avant vendredi », que tu convertis à partir de la date du jour). Sinon null.\nLa date d'un événement ou la fin d'une promotion ne sont PAS des échéances, sauf si Gauthier doit faire quelque chose avant (s'inscrire, confirmer, payer).\n\n## raison\nUne phrase courte qui justifie action et domaine en citant l'élément décisif de l'email.\n\n# Indications sur l'expéditeur\nLe champ « Type d'expéditeur » est calculé automatiquement et peut se tromper :\n- humain_direct : une personne écrit directement à Gauthier ;\n- liste_diffusion : message envoyé à une liste ;\n- automatique : notification, alerte, newsletter ou envoi groupé.\n\n# Exemples\n\nEmail (reçu le jeudi 15 octobre 2026) — Expéditeur : Julie Martin <j.martin@acme-industrie.fr> — Type : humain_direct — Objet : Entretien technicien de maintenance — Corps : « Bonjour Gauthier, suite à votre candidature, pouvez-vous me confirmer votre disponibilité pour un entretien mardi 20 octobre à 14h ? Merci de me répondre d'ici lundi. »\nRéponse : {\"action\": \"repondre\", \"domaine\": \"emploi_formation\", \"echeance\": \"2026-10-19\", \"raison\": \"La recruteuse demande de confirmer une disponibilité d'entretien avant lundi.\"}\n\nEmail — Expéditeur : Indeed <alert@indeed.com> — Type : automatique — Objet : 5 nouvelles offres pour Technicien de maintenance — Corps : « 5 nouvelles offres correspondent à votre recherche : Technicien de maintenance H/F, Arras… »\nRéponse : {\"action\": \"lire\", \"domaine\": \"emploi_formation\", \"echeance\": null, \"raison\": \"Alerte d'offres d'emploi correspondant à sa recherche, sans action demandée.\"}\n\nEmail — Expéditeur : MaBoutique <news@maboutique.fr> — Type : automatique — Objet : -30 % jusqu'à dimanche — Corps : « Profitez de -30 % sur tout le site jusqu'à dimanche minuit ! »\nRéponse : {\"action\": \"rien\", \"domaine\": \"promo\", \"echeance\": null, \"raison\": \"Promotion commerciale ; la fin de l'offre n'engage pas Gauthier.\"}\n\nEmail — Expéditeur : Service admissions <admissions@cfa-exemple.fr> — Type : humain_direct — Objet : Votre dossier — Corps : « Nous avons bien reçu votre dossier. Il sera étudié en commission le 22 octobre et nous reviendrons vers vous. »\nRéponse : {\"action\": \"attendre\", \"domaine\": \"emploi_formation\", \"echeance\": null, \"raison\": \"Le dossier de Gauthier est reçu et sera étudié en commission ; la date est celle de la commission, pas une échéance pour lui.\"}\n\nEmail — Expéditeur : Ma Banque <noreply@mabanque.fr> — Type : automatique — Objet : Activez votre nouvelle carte — Corps : « Votre carte arrive à expiration. Activez la nouvelle carte avant le 31 octobre 2026 depuis votre espace client. »\nRéponse : {\"action\": \"agir\", \"domaine\": \"admin_finance\", \"echeance\": \"2026-10-31\", \"raison\": \"La banque demande d'activer la nouvelle carte avant le 31 octobre.\"}",
               "type": "string"
             }
           ]
@@ -415,7 +341,7 @@
         -208,
         -96
       ],
-      "id": "eb74aa83-9b5c-4c91-8e0a-264317611641",
+      "id": "f6ac1218-8ce7-48a0-8685-930ee79ee26e",
       "name": "Set system prompt",
       "executeOnce": true
     },
@@ -424,20 +350,273 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        1056,
+        1280,
         -96
       ],
-      "id": "f460acea-5365-48a0-9881-d8c3a7d4772c",
+      "id": "573e2a9b-fe0f-496f-b27c-c40973214f8e",
       "name": "TODO",
       "notes": "TODO : add log to see when free model fails (and how many times)"
+    },
+    {
+      "parameters": {
+        "model": "ministral-14b-latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        912,
+        128
+      ],
+      "id": "e16fed44-48da-4801-a7d0-fc7a01fe6d6c",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "hchHMMqr0pVXwgdx",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "4qW880WhjtqabLMN"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "df1fd058-0772-4271-b11d-fc9145287985",
+      "name": "Apply rules (sub-workflow)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "rm1",
+              "leftValue": "={{ $json.rule_match }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "ea1cf433-953e-44e7-bf00-9b9b7552b235",
+      "name": "Rule matched?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        -256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('When Executed by Another Workflow').first().json.data_table_id ?? 'lThskgFSZdvWCBJT' }}"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mail_id",
+              "keyValue": "={{ $json.mail_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "category",
+              "id": "category",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reason",
+              "id": "reason",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "category_origin",
+              "id": "category_origin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "category": "={{ $json.rule_category }}",
+            "category_origin": "regle",
+            "reason": "=Règle : {{ $json.rule_note }}",
+            "status": "02_LLM_processed"
+          }
+        },
+        "options": {}
+      },
+      "id": "bf140de3-f347-4a5d-9218-96ca57484b25",
+      "name": "Write forced category",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        -448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('When Executed by Another Workflow').first().json.data_table_id ?? 'lThskgFSZdvWCBJT' }}"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "mail_id",
+              "keyValue": "={{ $json.mail_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "status",
+              "id": "status",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "reason",
+              "id": "reason",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            },
+            {
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "category_origin",
+              "id": "category_origin",
+              "readOnly": false,
+              "removed": false,
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "category_origin": "llm_error",
+            "reason": "={{ 'Erreur LLM (Mistral + Groq) : ' + ($json.error ?? 'inconnue') }}",
+            "status": "02_LLM_error"
+          }
+        },
+        "options": {}
+      },
+      "id": "31fed589-4098-4f7a-9f77-d1476df6e41e",
+      "name": "Mark LLM error",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1968,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Le LLM constate des faits (action, domaine, échéance) ; le code décide de la catégorie.\nconst o = $json.output || {};\nconst today = DateTime.now().setZone('Europe/Paris').startOf('day');\n\nlet echeance = null;\nlet days_left = null;\nif (o.echeance) {\n  const d = DateTime.fromISO(o.echeance, { zone: 'Europe/Paris' });\n  if (d.isValid) {\n    echeance = d.toISODate();\n    days_left = Math.round(d.startOf('day').diff(today, 'days').days);\n  }\n}\n\n// Domaines pour lesquels un mail « à lire » mérite d'être montré\nconst IMPORTANT = ['emploi_formation', 'admin_finance', 'pro', 'recherche_reseau', 'perso'];\n\nlet category = 'a_traiter'; // filet de sécurité si la sortie est incomplète\nif (o.domaine === 'promo') category = 'ignorer';\nelse if (o.action === 'repondre' || o.action === 'agir') category = (days_left !== null && days_left <= 2) ? 'urgent' : 'a_traiter';\nelse if (o.action === 'attendre') category = 'en_attente';\nelse if (o.action === 'lire') category = IMPORTANT.includes(o.domaine) ? 'a_lire' : 'ignorer';\nelse if (o.action === 'rien') category = 'ignorer';\n\nreturn { json: {\n  mail_id: $('Loop Over Items').item.json.mail_id,\n  category,\n  action: o.action ?? null,\n  domaine: o.domaine ?? null,\n  echeance,\n  days_left,\n  reason: o.raison ?? ''\n} };"
+      },
+      "id": "b5e25b6e-2f9c-4198-9dc4-b02504c12b16",
+      "name": "Compute category",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        -320
+      ],
+      "notes": "Le LLM extrait des faits (action, domaine, échéance) ; ce code décide de la catégorie."
     }
   ],
   "connections": {
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "AI Agent": {
       "main": [
         [
           {
-            "node": "Add mail_id to LLM output",
+            "node": "Compute category",
             "type": "main",
             "index": 0
           }
@@ -446,28 +625,6 @@
           {
             "node": "TODO",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Groq Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Structured Output Parser": {
-      "ai_outputParser": [
-        [
-          {
-            "node": "AI Agent",
-            "type": "ai_outputParser",
             "index": 0
           }
         ]
@@ -489,28 +646,6 @@
         [
           {
             "node": "Shorten mail if longer than 750 chararacters",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Shorten mail if longer than 750 chararacters": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Add mail_id to LLM output": {
-      "main": [
-        [
-          {
-            "node": "Update data table with LLM output",
             "type": "main",
             "index": 0
           }
@@ -555,26 +690,15 @@
       "main": [
         [
           {
-            "node": "Add mail_id to LLM output",
+            "node": "Compute category",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Stop and Error",
+            "node": "Mark LLM error",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenRouter Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "AI Agent1",
-            "type": "ai_languageModel",
             "index": 0
           }
         ]
@@ -608,6 +732,90 @@
           {
             "node": "AI Agent1",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shorten mail if longer than 750 chararacters": {
+      "main": [
+        [
+          {
+            "node": "Apply rules (sub-workflow)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply rules (sub-workflow)": {
+      "main": [
+        [
+          {
+            "node": "Rule matched?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rule matched?": {
+      "main": [
+        [
+          {
+            "node": "Write forced category",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark LLM error": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute category": {
+      "main": [
+        [
+          {
+            "node": "Update data table with LLM output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]

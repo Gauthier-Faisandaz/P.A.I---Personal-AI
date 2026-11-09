@@ -1,0 +1,414 @@
+{
+  "name": "02-sub_Apply_rules v5",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "a6a65936-0acd-4fa7-a2a2-df081c76d4d2",
+      "name": "Mails to check",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "y8h0OGZJhRNgwo80",
+          "mode": "id"
+        },
+        "returnAll": true
+      },
+      "id": "0b1f7aa6-d7b6-4778-a1f1-fdd0efb8e3a6",
+      "name": "Get email rules",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {
+          "clashHandling": {
+            "values": {
+              "resolveClash": "preferLast"
+            }
+          }
+        }
+      },
+      "id": "c57d6cf2-b389-4ba4-8749-3a150871d95c",
+      "name": "Mails x rules",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "mail_id",
+        "joinMode": "keepNonMatches",
+        "outputDataFrom": "input2",
+        "options": {}
+      },
+      "id": "bf69443d-c156-40b6-a4e5-d402469fb712",
+      "name": "Mails without rule",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1776,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.enabled === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.sender_email ?? '' }}",
+              "rightValue": "={{ $json.sender_pattern ?? '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "c3",
+              "leftValue": "={{ $json.mail_title ?? '' }}",
+              "rightValue": "={{ $json.title_pattern ?? '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "c4",
+              "leftValue": "={{ $json.forced_category ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "c5",
+              "leftValue": "={{ ($json.sender_pattern ?? '') + ($json.title_pattern ?? '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "id": "6f3749c6-fad5-4fca-a282-e808988e76a4",
+      "name": "Applicable rule",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "rule_score",
+              "value": "={{ ($json.sender_pattern ? 1000 : 0) + ($json.title_pattern ? 1000 : 0) + ($json.sender_pattern ?? '').length + ($json.title_pattern ?? '').length }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "5e06950a-851e-4a83-b5a1-7f3f9dbe2707",
+      "name": "Precision score",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "rule_score",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "59b404c0-f34d-4a44-8261-65a937491a87",
+      "name": "Most precise first",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "mail_id",
+        "options": {}
+      },
+      "id": "3843461b-6404-42b1-ae16-37da3ccdfeb6",
+      "name": "One rule per mail",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "rule_match",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "rule_category",
+              "value": "={{ $json.forced_category }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "rule_note",
+              "value": "={{ $json.note }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "1c754f7e-ec01-40f0-8e36-210e39f11bba",
+      "name": "Rule found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "504a335f-a04a-48f3-ad9b-606fbf1a71a4",
+      "name": "All mails",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2272,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n1",
+              "name": "rule_match",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "729e68d2-33fb-49ce-b06f-fd23b089a115",
+      "name": "No rule",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2064,
+        416
+      ]
+    }
+  ],
+  "connections": {
+    "Mails to check": {
+      "main": [
+        [
+          {
+            "node": "Get email rules",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mails x rules",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Mails without rule",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get email rules": {
+      "main": [
+        [
+          {
+            "node": "Mails x rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mails x rules": {
+      "main": [
+        [
+          {
+            "node": "Applicable rule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mails without rule": {
+      "main": [
+        [
+          {
+            "node": "No rule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Applicable rule": {
+      "main": [
+        [
+          {
+            "node": "Precision score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Precision score": {
+      "main": [
+        [
+          {
+            "node": "Most precise first",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Most precise first": {
+      "main": [
+        [
+          {
+            "node": "One rule per mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One rule per mail": {
+      "main": [
+        [
+          {
+            "node": "Rule found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rule found": {
+      "main": [
+        [
+          {
+            "node": "Mails without rule",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "All mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No rule": {
+      "main": [
+        [
+          {
+            "node": "All mails",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "12721bc3591aa99439bef04dd84423da1fd1d15f668874d074615b3865018390"
+  }
+}
