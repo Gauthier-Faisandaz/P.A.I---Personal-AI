@@ -24,6 +24,23 @@ Décision de Gauthier (23/09) : on verra plus tard. Le filtre tient en une ligne
 
 ---
 
+## Boîte de réception
+
+### Durée d'affichage des mails lus
+Décidé le 9/11 : un « à lire » lu reste 24 h, un « à traiter » (ou « en attente ») lu
+reste 3 jours, puis il disparaît. Choix provisoire, **à revoir à l'usage**.
+Les règles vivent dans le workflow n8n `XX_Webhook_Email_dispenser` ;
+le contrat est décrit dans `docs/contrat-bus-n8n.md`.
+
+### Mails non lus qui ne vieillissent jamais
+`04_Sync_read_status` ne vérifie le statut « lu » que des mails des 3 derniers jours.
+Un mail plus ancien, même lu dans Gmail, reste « non lu » dans la table, donc
+affiché pour toujours (règle « non lu = toujours affiché »). Dès le 10/11, des
+« à lire » du 6/11 sont concernés. À trancher côté n8n : allonger la fenêtre de 04,
+ou ne plus afficher un non-lu au-delà de N jours.
+
+---
+
 ## Veille
 
 - **« N à lire »** compte aujourd'hui **tous** les items, pas seulement les neufs. Voulu ?
@@ -49,7 +66,8 @@ restent, avec « agenda injoignable ») et son heure de synchro reste
 (`fetch-meteo.sh` garde déjà la dernière réponse : modèle possible.) À décider.
 
 ### Contrat n8n ↔ eww
-Écrire les fiches « Veille » et « À venir » dans `docs/contrat-bus-n8n.md` (proposé le 23/09).
+Écrire les fiches « Veille » et « À venir » dans `docs/contrat-bus-n8n.md` (proposé le 23/09 ;
+la fiche « Boîte de réception » y est depuis le 9/11).
 Pour À venir, le contrat est désormais simple : n8n renvoie les évènements BRUTS de sa table
 (`title`, `startDate`, `endDate`) ; `fetch-venir.sh` groupe et lit Taskwarrior en local.
 
