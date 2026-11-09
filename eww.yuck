@@ -282,21 +282,28 @@
   (eventbox :class "item ${it.mail_id == mail_modale ? 'selected' : ''}"
             :onclick "setsid -f bash ~/.config/eww/ui.sh open mail '${it.mail_id}' >/dev/null 2>&1"
     (box :class "item-corps" :orientation "v" :space-evenly false :hexpand true
-      ;; "!" des mails urgents : label a part pour etre TOUJOURS en gras (le
-      ;; sujet ne l'est que non lu). Meme signe que le groupe EN RETARD d'A
-      ;; VENIR ; remplace ⚠, trop fin (police de secours). Une seule ligne
-      ;; de 18px : hauteur inchangee pour mise-en-page.py.
+      ;; Signes devant le sujet : "!" = urgent, "★" = important (colonne
+      ;; important de decision.csv, decide par n8n ; les deux peuvent
+      ;; coexister : "! ★"). Label a part pour etre TOUJOURS en gras (le
+      ;; sujet ne l'est que non lu). "!" est le meme signe que le groupe EN
+      ;; RETARD d'A VENIR ; il remplace ⚠, trop fin (police de secours).
+      ;; ★ (etoile PLEINE, choix du 9/11) est dans DejaVu Sans Mono (verifie
+      ;; avec fc-list) : pas de police de secours, ligne toujours de 18px,
+      ;; hauteur inchangee pour mise-en-page.py.
       (box :orientation "h" :space-evenly false :hexpand true
-        (label :class "item-urgent" :visible {it.urgent} :text "!")
+        (label :class "item-urgent" :visible {it.urgent || (it.important ?: false)}
+               :text "${it.urgent ? '!' : ''}${it.urgent && (it.important ?: false) ? ' ' : ''}${(it.important ?: false) ? '★' : ''}")
         (label :class "item-subject ${it.read ? '' : 'nonlu'}"
                :halign "start" :hexpand true :wrap false :truncate true
                :text "${it.read ? '' : '● '}${it.subject_short}"))
       (label :class "item-meta" :halign "start" :truncate true :visible {it.meta != ''}
              :text "      ${it.meta}"))))
 
-(defwidget section [label items]
+;; Section de mails : libelle ET ordre viennent de n8n (docs/contrat-bus-n8n.md) ;
+;; ce widget ne connait aucune categorie.
+(defwidget section [libelle items]
   (box :class "section" :orientation "v" :space-evenly false
-    (label :class "sect-label" :halign "start" :text "► ${label}")
+    (label :class "sect-label" :halign "start" :text "► ${libelle}")
     (for it in {items ?: []}
       (mail_item :it it))))
 
@@ -309,7 +316,7 @@
            :text "Aucun mail.")
     (box :orientation "v" :space-evenly false
       (for s in {digest.sections ?: []}
-        (section :label {s.label} :items {s.items})))))
+        (section :libelle {s.libelle} :items {s.items})))))
 
 
 ;; ==========================================================================
@@ -447,7 +454,7 @@
   (modale_contenu
     :titre {mail.subject ?: '(mail introuvable)'}
     :ligne1 "${mail.from ?: ''}  <${mail.email ?: ''}>"
-    :ligne2 "${mail.category ?: ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}"
+    :ligne2 "${mail.category ?: ''}${(mail.important ?: false) ? ' ★ important' : ''} · ${mail.intent ?: ''} · ${(mail.read ?: false) ? 'lu' : 'non lu'}"
     :texte {mail.reason ?: ''}
     :resume {mail.summary ?: ''}
     :l1 "Ouvrir email" :c1 "xdg-open '${mail.url ?: ''}'"
