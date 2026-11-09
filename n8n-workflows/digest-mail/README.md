@@ -4,12 +4,14 @@ Exports (JSON) des workflows n8n qui alimentent le panneau **Boîte de réceptio
 
 ## Pipeline
 
+> **Versions.** `01-webhook-digest.json` est à jour (module mail v5, novembre 2026). Les autres fichiers sont encore les exports de l'**ancien** pipeline (v4, juillet 2026) : ils seront remplacés par les workflows v5.
+
 1. **`00-main-orchestrator.json`** — déclenché par un trigger Gmail (poll toutes les 5 min sur les mails non lus). Nettoie le contenu du mail, l'enregistre dans une data table n8n, puis appelle en cascade les workflows 2 à 5 ci-dessous (référencés dans n8n par leur `workflowId`, pas par ce fichier).
 2. **`02-sub-determine-data-table.json`** — trouve ou crée la data table du projet (`PAI_Emails`) et renvoie son id.
 3. **`03-organize-mail.json`** — pour chaque mail, un agent IA (Groq Llama 3.3 70B, repli sur OpenRouter) le classe en catégorie (`urgent` / `a_traiter` / `en_attente` / `ignorer`), détecte l'intention et une éventuelle deadline.
 4. **`04-summarize-mail.json`** — résume en 1 à 3 phrases les mails jugés pertinents (ignore ceux catégorisés `ignorer`).
 5. **`05-mark-mail-read.json`** — tourne toutes les heures (ou à la demande) : vérifie sur Gmail si un mail traité a été lu depuis, et met à jour son statut dans la data table en conséquence.
-6. **`01-webhook-digest.json`** — webhook (auth Basic) interrogé par `fetch-digest.sh` du dashboard : lit la data table, filtre les mails `summarized`/`read` et répond en JSON.
+6. **`01-webhook-digest.json`** — webhook (auth Basic) interrogé par `fetch-digest.sh` du dashboard : lit la data table et **construit les sections** (À TRAITER, EN ATTENTE, À LIRE), leur ordre, leurs libellés et le résumé de l'en-tête ; le dashboard ne fait qu'afficher. Contrat et règles (durée d'affichage des mails lus, ordre) : [`docs/contrat-bus-n8n.md`](../../docs/contrat-bus-n8n.md).
 
 ## Réimport
 
