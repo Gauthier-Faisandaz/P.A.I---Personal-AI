@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Mails (JSON a plat sous "data") depuis n8n via ~/.netrc.
-# 2 sections : À TRAITER (inclut category=urgent, flag urgent) et EN ATTENTE.
-# read/unread via status ; lien Gmail via mail_id ; index by_id pour survol/clic.
+# Boite de reception : sections de mails construites par n8n, via ~/.netrc.
+# Contrat (format, regles, pourquoi) : docs/contrat-bus-n8n.md.
+# n8n decide QUELS mails, dans QUELLE section, dans QUEL ordre, avec quel
+# libelle, et ecrit le resume de l'en-tete. Ce script ne fait que la mise en
+# forme qui depend de l'heure locale ou de l'ecran : age ("3 h"), sujet
+# tronque, emojis retires (nettoyer.py), ligne "expediteur · age", lien
+# Gmail, index by_id pour la modale. Il ne connait aucune categorie.
 URL="https://n8n.power-of-automation.link/webhook/c9d179c1-870f-4973-ae04-29f4d2c22766"
 # DIGEST_EXEMPLE permet de tester avec un faux fichier au lieu de n8n :
 #   DIGEST_EXEMPLE=~/.config/eww/exemples/mails-test.json bash ~/.config/eww/sync.sh digest
@@ -17,18 +21,6 @@ import sys, json, datetime
 import os
 sys.path.insert(0, os.path.expanduser("~/.config/eww"))
 from nettoyer import propre    # sans emoji, espaces normalises
-LABELS = {"a_traiter":"À TRAITER","en_attente":"EN ATTENTE"}
-def mails(raw):
-    if isinstance(raw, list):
-        if len(raw)==1 and isinstance(raw[0],dict) and isinstance(raw[0].get("data"),list):
-            return raw[0]["data"]
-        return raw
-    if isinstance(raw, dict):
-        for k in ("data","items","mails","results"):
-            if isinstance(raw.get(k),list): return raw[k]
-        for k in ("body","json"):
-            if isinstance(raw.get(k),(dict,list)): return mails(raw[k])
-    return []
 def age_from(s):
     if not s: return ""
     try:
@@ -41,39 +33,37 @@ def age_from(s):
     if diff<86400: return f"{int(diff//3600)} h"
     if diff<604800: return f"{int(diff//86400)} j"
     return dt.strftime("%d/%m")
-def truthy(v): return v in (True,"true","True",1,"1")
 def short(s, n=55):
     s = s or ""
     return (s[:n].rstrip()+" [...]") if len(s) > n else s
 def norm(m):
     mid=m.get("mail_id") or ""
-    frm=propre(m.get("sender_name") or m.get("from"))
-    cat=(m.get("category") or "").strip()
-    age=age_from(m.get("createdAt") or m.get("date") or "")
-    subj=propre(m.get("mail_title") or m.get("subject")) or "(sans objet)"
+    frm=propre(m.get("sender_name"))
+    age=age_from(m.get("createdAt"))
+    subj=propre(m.get("mail_title")) or "(sans objet)"
     return {"subject":subj,"subject_short":short(subj),
             "from":frm,"email":m.get("sender_email") or "","age":age,
             "meta":" · ".join(p for p in (frm,age) if p),
-            "read":("mail_read" in (m.get("status") or "")),
-            "urgent":cat in ("urgent","urgences"),
-            "category":cat,"intent":m.get("intent") or "",
+            "read":m.get("lu") is True,
+            "urgent":m.get("urgent") is True,
+            "important":m.get("important") is True,
+            "category":m.get("category") or "","intent":m.get("intent") or "",
             "reason":m.get("reason") or "","summary":m.get("mail_summary") or "",
             "mail_id":mid,
             "url":("https://mail.google.com/mail/u/0/#all/"+mid) if mid else ""}
 try: raw=json.loads(sys.stdin.read() or "{}")
 except Exception: raw={}
-items=[norm(m) for m in mails(raw) if isinstance(m,dict)]
-buckets={}
-for it in items:
-    b="a_traiter" if it["category"] in ("a_traiter","urgent","urgences") else it["category"]
-    buckets.setdefault(b,[]).append(it)
-sections=[{"label":LABELS[c],"items":buckets[c]} for c in ("a_traiter","en_attente") if buckets.get(c)]
-by_id={it["mail_id"]:it for it in items if it["mail_id"]}
-# resume = texte affiche tel quel dans l en-tete du panneau (replie ou non) :
-# nombre de mails A TRAITER (urgents compris, meme regroupement que ci-dessus).
-n=len(buckets.get("a_traiter",[]))
-resume=f"{n} à traiter" if n else "rien à traiter"
-print(json.dumps({"sections":sections,"by_id":by_id,"resume":resume,
+# "Respond to Webhook" renvoie un objet ; une liste d un seul objet est
+# toleree (autre reglage possible du noeud).
+if isinstance(raw,list) and len(raw)==1: raw=raw[0]
+if not isinstance(raw,dict): raw={}
+sections=[]
+for s in raw.get("sections") or []:
+    if not isinstance(s,dict): continue
+    items=[norm(m) for m in s.get("items") or [] if isinstance(m,dict)]
+    if items:   # jamais de titre orphelin
+        sections.append({"cle":s.get("cle") or "","libelle":propre(s.get("libelle")),"items":items})
+by_id={it["mail_id"]:it for s in sections for it in s["items"] if it["mail_id"]}
+print(json.dumps({"sections":sections,"by_id":by_id,"resume":raw.get("resume") or "",
                   "sync":datetime.datetime.now().strftime("%H:%M")},ensure_ascii=False))
 ' | bash "$HOME/.config/eww/publier.sh" digest   # copie dans le bus + recalcul des hauteurs
-
